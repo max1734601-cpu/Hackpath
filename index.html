@@ -1266,22 +1266,23 @@ function renderResult(){
   var total=scoreable.length,pctC=total>0?correct/total:1;
   var passed=pctC>=.7,stars=pctC>=.95?3:pctC>=.8?2:1;
   if(passed)SFX.complete();
-  var w=document.createElement('div');w.className='center';
-  var card=document.createElement('div');card.className='card fadeIn gap';card.style.cssText='text-align:center;width:100%;max-width:380px';
-  card.innerHTML='<div style="font-size:1.4rem;font-weight:800;margin-top:8px">'+(passed?'\uD83C\uDF89 Level Complete!':'\uD83D\uDCAA Almost \u2014 try again!')+'</div>';
-  card.innerHTML+='<div style="color:var(--text2);font-size:.9rem">'+correct+'/'+total+' correct'+(total===0?' (info only)':'')+'</div>';
+  var w=document.createElement('div');w.className='hp';w.style.cssText='display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:100vh;min-height:100dvh;padding:20px';
+  var card=document.createElement('div');card.className='card fadeIn gap';card.style.cssText='text-align:center;width:100%';
+  card.innerHTML='<div style="font-size:1.8rem;font-weight:800;margin-top:12px">'+(passed?'\uD83C\uDF89 Level Complete!':'\uD83D\uDCAA Almost \u2014 try again!')+'</div>';
+  card.innerHTML+='<div style="color:var(--text2);font-size:1rem;margin-top:4px">'+correct+'/'+total+' correct'+(total===0?' (info only)':'')+'</div>';
   if(passed&&total>0){
-    var sr=document.createElement('div');sr.style.cssText='display:flex;gap:8px;justify-content:center';
-    for(var s=1;s<=3;s++){var sp=document.createElement('span');sp.style.cssText='font-size:2rem;animation-delay:'+s*.15+'s;opacity:'+(s<=stars?1:.15);if(s<=stars)sp.className='starPop';sp.textContent='\u2B50';sr.appendChild(sp)}
+    var sr=document.createElement('div');sr.style.cssText='display:flex;gap:12px;justify-content:center;margin:12px 0';
+    for(var s=1;s<=3;s++){var sp=document.createElement('span');sp.style.cssText='font-size:2.5rem;animation-delay:'+s*.15+'s;opacity:'+(s<=stars?1:.15);if(s<=stars)sp.className='starPop';sp.textContent='\u2B50';sr.appendChild(sp)}
     card.appendChild(sr);
   }
-  if(passed)card.innerHTML+='<div style="font-size:.85rem;color:var(--green);font-weight:600">+'+Math.max(correct*10,10)+' XP</div>';
-  else card.innerHTML+='<div style="font-size:.85rem;color:var(--textDim)">Need 70% to pass</div>';
-  var btn=document.createElement('button');btn.className='btn full';btn.textContent=passed?'Continue':'Retry';
+  if(passed){var xpd=document.createElement('div');xpd.style.cssText='font-size:1.1rem;color:var(--green);font-weight:700;margin:8px 0';xpd.textContent='+'+Math.max(correct*10,10)+' XP';card.appendChild(xpd)}
+  else{var nd=document.createElement('div');nd.style.cssText='font-size:.9rem;color:var(--textDim);margin:8px 0';nd.textContent='Need 70% to pass';card.appendChild(nd)}
+  if(level.title){var lt=document.createElement('div');lt.style.cssText='font-size:.8rem;color:var(--textDim);margin-bottom:8px';lt.textContent=level.title;card.appendChild(lt)}
+  var btn=document.createElement('button');btn.className='btn full';btn.style.cssText='padding:14px;font-size:1rem;margin-top:4px';btn.textContent=passed?'Continue':'Retry';
   btn.onclick=function(){if(passed){var old=S.progress[S.activeId]||{};S.progress[S.activeId]={passed:true,stars:Math.max(stars,old.stars||0),xp:Math.max(correct*10,old.xp||0)};saveP(S.user,S.progress)}S.screen='map';render()};
   card.appendChild(btn);
-  if(passed){var again=document.createElement('button');again.className='btn sec full';again.textContent='Practice Again';again.onclick=function(){startLesson(S.activeId)};card.appendChild(again)}
-  root.appendChild(w.appendChild(card)||w);
+  if(passed){var again=document.createElement('button');again.className='btn sec full';again.style.padding='12px';again.textContent='Practice Again';again.onclick=function(){startLesson(S.activeId)};card.appendChild(again)}
+  w.appendChild(card);root.appendChild(w);
 }
 
 // === BOOT ===
