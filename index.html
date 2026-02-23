@@ -284,11 +284,11 @@ var SEC1 = {
     {id:"u1l2",title:"Types of Hackers",rounds:[
       {type:"teach",text:"White Hat = hired with permission, like a locksmith testing a bank's locks. Black Hat = criminals who steal data. Grey Hat = finds bugs without asking \u2014 still illegal, no permission."},
       {type:"pick",q:"A locksmith hired by a bank to test their locks is most like a:",opts:["White Hat \u2014 legal and hired","Black Hat \u2014 criminal","Grey Hat \u2014 no permission","Script Kiddie \u2014 using tools blindly"],a:"White Hat \u2014 legal and hired",why:"White Hats have written permission. That's what makes them legal."},
-      {type:"teach",text:"Script Kiddies download hacking tools and run them without understanding how they work. Red Teams are hired attackers who simulate real break-ins. Blue Teams are the defenders who try to stop them. Purple Teams do both attack AND defense.",detail:"White Hat = Legal hacker with permission (pen tester, security consultant).\nBlack Hat = Criminal hacker, no permission, steals data.\nGrey Hat = No permission but doesn't steal \u2014 still illegal.\nScript Kiddie = Runs tools without understanding them.\nRed Team = Simulates attackers (offensive).\nBlue Team = Defends against attacks (defensive).\nPurple Team = Combines red and blue (both sides)."},
+      {type:"teach",text:"More hacker types: A Script Kiddie is someone who downloads hacking tools and clicks 'run' without actually understanding what they do. Companies also have special security teams. Red Team = the people hired to pretend to be hackers and attack the company. Blue Team = the defenders who try to stop them. Purple Team = people who do both.",detail:"White Hat = Legal hacker with permission (pen tester, security consultant).\nBlack Hat = Criminal hacker, no permission, steals data.\nGrey Hat = No permission but doesn't steal \u2014 still illegal.\nScript Kiddie = Runs tools without understanding them.\nRed Team = Simulates attackers (offensive).\nBlue Team = Defends against attacks (defensive).\nPurple Team = Combines red and blue (both sides)."},
       {type:"match",q:"\uD83C\uDFA9 Match the hat to the hacker:",pairs:[["White Hat \uD83E\uDD20","Legal, hired to test"],["Black Hat \uD83D\uDC80","Criminal, steals data"],["Grey Hat \uD83D\uDC7B","No permission, no theft"],["Red Team \uD83D\uDD34","Simulates real attacks"]],why:"Each type plays a different role in cybersecurity. White and Red are legal, Black is criminal."},
     ]},
     {id:"u1l3",title:"Legal Rules & 5 Phases",rounds:[
-      {type:"teach",text:"Before hacking anything, you need paperwork. Scope = which systems you can test. ROE (Rules of Engagement) = what methods are allowed. NDA = you keep everything secret."},
+      {type:"teach",text:"Before you hack anything, you need written permission. Think of it like a contract. The 'Scope' tells you exactly which computers or websites you're allowed to test \u2014 touch anything else and you're breaking the law. 'Rules of Engagement' tells you what methods you can use. And you sign an NDA (Non-Disclosure Agreement) promising to keep everything you find secret."},
       {type:"teach",text:"Every hack follows 5 steps: 1) Recon = scout from distance. 2) Scanning = check every door. 3) Exploitation = pick the weakest lock. 4) Post-Exploitation = find the treasure. 5) Reporting = write down how you got in."},
       {type:"order",q:"Put the 5 pentest phases in order:",items:["Reconnaissance","Scanning","Exploitation","Post-Exploitation","Reporting"],why:"Always follow this order. Never exploit before you scan."},
       {type:"scenario",situation:"A friend asks you to hack their ex's Instagram to see if they're cheating.",q:"What do you do?",opts:["Refuse \u2014 unauthorized access is illegal","Help them, it's for a good cause","Do it but don't tell anyone","Only if they pay you"],a:"Refuse \u2014 unauthorized access is illegal",why:"Accessing someone's account without consent is a crime regardless of reason."},
@@ -356,16 +356,16 @@ var SEC1 = {
   // ---- UNIT 3: PIPES & LINUX ----
   {id:"u3",title:"Pipes & Linux",desc:"Chain commands, permissions, and key files",levels:[
     {id:"u3l1",title:"Pipes & Redirection",rounds:[
-      {type:"teach",text:"The pipe symbol | is your secret weapon. It takes the output of one command and feeds it into another. Example: cat /etc/passwd shows ALL user accounts, but cat /etc/passwd | grep bash filters for ONLY the ones who can actually log in.",detail:"| (pipe) = takes what one command outputs and feeds it as input to the next command.\nThink of it like an assembly line: each command does one job and passes the result along.\nYou can chain as many as you want: command1 | command2 | command3"},
+      {type:"teach",text:"The pipe symbol | is one of the most powerful things in the terminal. Here's the idea: normally a command shows its results on screen. But with a pipe, you can send those results directly into ANOTHER command for further processing. Think of it like an assembly line in a factory \u2014 one machine does its job, passes the result to the next machine. Example: cat /etc/passwd shows ALL user accounts (hundreds of lines). But cat /etc/passwd | grep bash takes that huge list and filters it down to ONLY the users who can actually log in.",detail:"| (pipe) = takes what one command outputs and feeds it as input to the next command.\nThink of it like an assembly line: each command does one job and passes the result along.\nYou can chain as many as you want: command1 | command2 | command3"},
       {type:"teach",text:"/etc/passwd is a file on every Linux machine listing all user accounts. We already know cat reads files and grep searches for text. Chain them with | to filter the huge list down to what matters."},
       {type:"hack",story:"You've broken into a Linux server. The user list has dozens of system accounts you don't care about. Use a pipe to show only the ones with real login access (bash).",q:"List only users who can log in. (Hint: cat /etc/passwd | grep bash)",a:["cat /etc/passwd | grep bash","grep bash /etc/passwd"],output:"root:x:0:0:root:/root:/bin/bash\nadmin:x:1000:1000::/home/admin:/bin/bash\ndev_ops:x:1001:1001::/home/dev_ops:/bin/bash\nbackup:x:1002:1002::/home/backup:/bin/bash\n\n4 users with login access.",success:"4 real accounts found! root, admin, dev_ops, and backup are your targets.",why:"The pipe | sends the full user list into grep, which filters for lines containing 'bash'.",quickCmds:["cat /etc/passwd | grep bash"]},
       {type:"teach",text:"> saves output to a file (overwrites it). >> adds to the end of a file. Example: nmap target > results.txt saves your scan results to read later."},
       {type:"build",q:"Build: list just the usernames with bash access",parts:["cat /etc/passwd","|","grep bash","|","cut -d: -f1"],answer:["cat /etc/passwd","|","grep bash","|","cut -d: -f1"],why:"Each | passes data to the next command. cut -d: -f1 grabs just the first piece (the username) from each line."},
     ]},
     {id:"u3l2",title:"File Permissions",rounds:[
-      {type:"teach",text:"File permissions: Read=4, Write=2, Execute=1. Add them up \u2014 7 means all three (4+2+1). chmod 755 = owner gets full access (7), everyone else can read and run but not change (5)."},
+      {type:"teach",text:"Every file on Linux has permissions that control who can do what. There are 3 actions: Read (look at it), Write (change it), and Execute (run it as a program). Each action has a number: Read=4, Write=2, Execute=1. Add them up for the level of access: 7 means all three (4+2+1=7). chmod 755 means the file owner gets full access (7), but everyone else can only read and run it, not change it (5)."},
       {type:"pick",q:"chmod 777 means:",opts:["Everyone can read, write, AND run the file","Only the owner has access","Nobody can access it","Read-only for everyone"],a:"Everyone can read, write, AND run the file",why:"7 = read+write+execute for ALL three groups. Very dangerous if on a sensitive file!"},
-      {type:"teach",text:"SUID is like a master key taped to a program. When a program has SUID set, it runs with the OWNER's power (usually the admin), no matter who runs it. The command find / -perm -4000 searches the entire computer for these special programs."},
+      {type:"teach",text:"Normally when you run a program, it runs with YOUR level of access. But some programs have a special flag called SUID \u2014 think of it like a master key taped to the program. When SUID is set, the program runs with the OWNER's power (usually the admin/root), even if a regular user runs it. This is a huge deal for hackers \u2014 if you find one of these programs and trick it, you can suddenly do admin-level things. The command find / -perm -4000 searches the entire computer for these special programs."},
       {type:"hack",story:"You're a low-level user on this server. You need to find programs that have the SUID 'master key' \u2014 programs that run with admin power even when YOU run them. If you find one you can trick, you become admin instantly.",q:"Search the whole system for SUID programs. (Hint: find / -perm -4000)",a:["find / -perm -4000","find / -perm -4000 2>/dev/null"],output:"/usr/bin/passwd\n/usr/bin/sudo\n/usr/bin/find       \u2190 \uD83D\uDEA8 Exploitable!\n/usr/bin/python3    \u2190 \uD83D\uDEA8 Exploitable!\n/usr/bin/vim        \u2190 \uD83D\uDEA8 Exploitable!\n/usr/bin/nmap\n\n6 SUID programs found. 3 can be abused!",success:"find, python3, AND vim all run with admin power! Each one can be tricked into giving you a full admin shell.",why:"find / -perm -4000 searches for programs with the SUID bit. These are your best path to becoming admin.",quickCmds:["find / -perm -4000 2>/dev/null"]},
     ]},
     {id:"u3l3",title:"Key Files & Users",rounds:[
@@ -402,9 +402,9 @@ var SEC1 = {
       {type:"pick",q:"A website usually runs on port:",opts:["80","22","445","3389"],a:"80",why:"HTTP (regular websites) = port 80. HTTPS (secure websites) = port 443."},
     ]},
     {id:"u4l2",title:"TCP, UDP & Subnets",rounds:[
-      {type:"teach",text:"TCP is like a phone call \u2014 both sides confirm the connection before talking. It goes: 'Hey can we talk?' (SYN) \u2192 'Sure!' (SYN-ACK) \u2192 'Cool, here we go' (ACK). This is called the 3-way handshake. Most services use TCP because it's reliable."},
+      {type:"teach",text:"There are two ways computers send data to each other. TCP is like a phone call \u2014 before anyone talks, both sides make sure the other is listening. Your computer says 'Hey, you there?' and the other says 'Yeah I'm here, go ahead.' This back-and-forth is called a 'handshake.' TCP is used for most things (websites, email, file transfers) because nothing gets lost."},
       {type:"pick",q:"The 3-way handshake order is:",opts:["SYN \u2192 SYN-ACK \u2192 ACK","ACK \u2192 SYN \u2192 FIN","PING \u2192 PONG \u2192 GO","GET \u2192 POST \u2192 PUT"],a:"SYN \u2192 SYN-ACK \u2192 ACK",why:"SYN starts the call, SYN-ACK picks up, ACK confirms. Then data flows."},
-      {type:"teach",text:"UDP is like shouting across a room \u2014 fast but no guarantee anyone heard you. A subnet is a group of computers on the same network. 10.10.10.0/24 means 254 computers from 10.10.10.1 to 10.10.10.254 are in the group."},
+      {type:"teach",text:"UDP is the other way computers send data. It's like shouting across a room \u2014 you just yell the message without checking if anyone heard you. It's faster than TCP but less reliable. Video calls and online games use UDP because speed matters more than perfection. A subnet is just a group of computers on the same local network \u2014 like all the computers in one office building. When you see 10.10.10.0/24, that means about 254 computers from 10.10.10.1 to 10.10.10.254."},
       {type:"pick",q:"A /24 network contains how many usable addresses?",opts:["254","256","128","65534"],a:"254",why:"256 total minus 2 reserved ones (network address and broadcast) = 254 usable."},
     ]},
     {id:"u4l3",title:"Your Network Info",rounds:[
@@ -438,7 +438,7 @@ var SEC2 = {
   // ---- UNIT 5: PASSIVE RECON ----
   {id:"u5",title:"Passive Recon",desc:"Gather intel without touching the target",levels:[
     {id:"u5l1",title:"OSINT & Google Dorking",rounds:[
-      {type:"teach",text:"OSINT = gathering intel from public sources. Google, social media, job postings. The target has NO idea you're investigating them. Google dorking uses advanced operators to find hidden files and pages."},
+      {type:"teach",text:"Before you ever touch a target's computers, you gather information using only public sources \u2014 this is called OSINT (Open Source Intelligence). You search Google, look at their social media, read their job postings (which reveal what technology they use), and check public records. The target has NO idea you're investigating them because you're only looking at stuff that's already public. Google dorking means using special search tricks like site:target.com filetype:pdf to find files they didn't mean to share."},
       {type:"hack",story:"Client wants you to investigate NovaTech Corp. Before touching their servers, see what Google already knows. Use a Google dork to find exposed PDF documents on their site.",q:"Find all PDFs on novatech.com via Google.",a:["site:novatech.com filetype:pdf","site:target.com filetype:pdf","filetype:pdf site:novatech.com"],output:"Results:\n\u2022 novatech.com/docs/employee-handbook.pdf\n\u2022 novatech.com/hr/salary-bands-2024.pdf\n\u2022 novatech.com/internal/network-diagram.pdf\n\u2022 novatech.com/backup/db-credentials.pdf",success:"Network diagram AND database credentials exposed publicly! Critical finding without ever touching their servers.",why:"Google dorking reveals files the admin forgot to protect. site: limits to one domain, filetype: filters by extension.",quickCmds:["site:novatech.com filetype:pdf"]},
       {type:"pick",q:"OSINT gathering is:",opts:["Legal \u2014 it uses public info","Illegal without permission","Government only","Requires special tools"],a:"Legal \u2014 it uses public info",why:"You're just searching public sources. No laws broken."},
     ]},
@@ -544,7 +544,7 @@ var SEC3 = {
   // ---- UNIT 8: SQL INJECTION ----
   {id:"u8",title:"SQL Injection",desc:"Trick databases into giving up secrets",levels:[
     {id:"u8l1",title:"How SQLi Works",rounds:[
-      {type:"teach",text:"Imagine a bank vault with a voice-activated lock. It asks 'Name?' and 'Password?' then checks its list. If you say admin'-- the vault hears: 'Find admin and IGNORE the password.' The -- comments out everything after it."},
+      {type:"teach",text:"SQL injection is one of the most common hacks. Here's how it works: When you type your username and password on a website, the site sends a command to its database like 'Find someone named Bob with password 1234.' But if the site doesn't check your input carefully, you can break the command. By typing something like admin'-- as the username, you change the command to 'Find someone named admin and IGNORE everything else.' The -- tells the database to skip the rest of the command, including the password check. You just logged in without knowing the password."},
       {type:"hack",story:"You're testing CryptoVault's login page. The form asks for username and password. Behind the scenes, it builds a database query with your input. Time to trick it.",q:"Break the login \u2014 bypass the password check.",a:["admin'--","' OR 1=1--","admin' OR 1=1--"],output:"SQL Query: SELECT * FROM users WHERE name='admin'--' AND pass='...'\n\n\u26A0\uFE0F Password check BYPASSED\n\nWelcome, admin!\nAccess Level: ADMINISTRATOR\nLast Login: 2024-01-14 03:42 AM\nBalance: $4,847,293.00",success:"You're in as admin with full access! The bank account balance is visible. Critical vulnerability.",why:"The ' breaks the string, -- comments out the password check. The database ignores everything after --.",quickCmds:["admin'--","' OR 1=1--"]},
       {type:"pick",q:"What does -- do in SQL?",opts:["Comments out the rest of the line","Deletes the database","Encrypts the query","Runs a second command"],a:"Comments out the rest of the line",why:"-- makes SQL ignore everything after it, including password checks."},
     ]},
@@ -553,7 +553,7 @@ var SEC3 = {
       {type:"hack",story:"Manual injection worked. Now bring in the big guns \u2014 sqlmap automates finding injection points, extracting databases, tables, and dumping all data.",q:"Unleash sqlmap on the vulnerable search page.",a:["sqlmap -u 'http://target/search?q=1' --dbs","sqlmap -u http://target/page?id=1 --dbs","sqlmap -u 'http://target/page?id=1' --dbs"],output:"[*] testing connection...\n[*] testing for SQL injection on parameter 'q'\n[+] parameter 'q' is VULNERABLE (MySQL)\n\navailable databases:\n[*] information_schema\n[*] cryptovault_prod\n[*] cryptovault_backup\n[*] mysql\n\n4 databases found!",success:"Found the production AND backup databases! sqlmap did in seconds what would take hours manually.",why:"sqlmap automates the entire SQLi process: detection, exploitation, and data extraction.",quickCmds:["sqlmap -u 'http://target/search?q=1' --dbs"]},
     ]},
     {id:"u8l3",title:"UNION Injection",rounds:[
-      {type:"teach",text:"UNION combines your query with the original. ' UNION SELECT username,password FROM users-- pulls credentials. First find column count with ORDER BY."},
+      {type:"teach",text:"Once you know a website is vulnerable to SQL injection, you can go further. UNION is a database command that lets you combine two searches into one. Normally the site searches for a product or user \u2014 but with UNION, you attach a second search that pulls sensitive data. For example, ' UNION SELECT username,password FROM users-- tells the database: 'Also show me every username and password.' Before this works, you need to figure out how many columns the original search returns, which you do by trying ORDER BY 1, ORDER BY 2, etc. until you get an error."},
       {type:"type",q:"Extract user data with UNION:",a:["' UNION SELECT username,password FROM users--","' UNION SELECT 1,2,3--"],why:"UNION combines results from two queries."},
       {type:"tf",q:"sqlmap can only find basic SQL injection.",a:false,why:"sqlmap handles blind, time-based, UNION, stacked queries, and more."},
     ]},
@@ -575,7 +575,7 @@ var SEC3 = {
   // ---- UNIT 9: XSS & WEB ATTACKS ----
   {id:"u9",title:"XSS & Web Attacks",desc:"Inject code and steal sessions",levels:[
     {id:"u9l1",title:"Cross-Site Scripting",rounds:[
-      {type:"teach",text:"XSS = planting a booby trap on a website. Your code runs in OTHER people's browsers. Stored XSS persists in the database (most dangerous). Reflected only works via a trick link."},
+      {type:"teach",text:"XSS (Cross-Site Scripting) means sneaking code into a website so it runs in other people's browsers. Imagine you post a comment on a website, but instead of normal text, you include a tiny script. When someone else views your comment, that script runs on THEIR computer \u2014 it could steal their login session, redirect them to a fake site, or grab their data. Stored XSS means your code gets saved in the website's database and hits everyone who views that page. Reflected XSS only works if someone clicks a specially crafted link you send them."},
       {type:"pick",q:"Most dangerous XSS type?",opts:["Stored","Reflected","DOM-based","All equal"],a:"Stored",why:"Stored XSS persists and affects every user who views the page."},
       {type:"tf",q:"XSS only works if the victim clicks a link.",a:false,why:"Stored XSS triggers automatically for anyone viewing the infected page."},
     ]},
@@ -638,12 +638,12 @@ var SEC3 = {
   // ---- UNIT 11: METASPLOIT ----
   {id:"u11",title:"Metasploit",desc:"Exploits, payloads, and shells",levels:[
     {id:"u11l1",title:"Metasploit Basics",rounds:[
-      {type:"teach",text:"Metasploit is your weapon vault \u2014 thousands of exploits ready to fire. Think of it like a robot locksmith with picks for every lock ever made. Workflow: search \u2192 use \u2192 set target \u2192 fire."},
+      {type:"teach",text:"Metasploit is a free tool that has thousands of pre-built hacking programs (called exploits) ready to use. Instead of writing your own attack code from scratch, you pick one from Metasploit's library, aim it at a target, and run it. The basic workflow is: 1) search for an exploit that matches what you found (like a specific software version), 2) use it, 3) set the target's IP address, 4) run it. If it works, you get a remote connection to the target computer."},
       {type:"hack",story:"A vulnerable FTP server is running vsftpd 2.3.4 \u2014 a version with a famous backdoor. Fire up Metasploit and find the exploit.",q:"Launch the Metasploit console.",a:["msfconsole"],output:"     ,           ,\n    /             \\\n   ((__---,,,---__))\n      (_) O O (_)\n         \\ _ /     msf6 >\n          |_|\n\n   =[ metasploit v6.3.40 ]\n   + -- --=[ 2345 exploits - 1220 payloads ]\n   + -- --=[ 1100 auxiliary - 399 post ]\n\nmsf6 >",success:"Metasploit loaded with 2,345 exploits ready to go!",why:"msfconsole launches the Metasploit Framework console."},
       {type:"order",q:"Metasploit workflow:",items:["search for exploit","use the module","set RHOSTS (target)","set LHOST (your IP)","exploit"],why:"This workflow applies to every single Metasploit exploit."},
     ]},
     {id:"u11l2",title:"Meterpreter",rounds:[
-      {type:"teach",text:"Meterpreter is your spy inside the target. Upload files, take screenshots, log keystrokes, dump ALL password hashes, migrate between processes, and pivot to other machines. It's the ultimate post-exploitation tool."},
+      {type:"teach",text:"When Metasploit successfully hacks a target, it gives you a special remote control tool called Meterpreter. Think of it as having a spy inside the target computer. With Meterpreter you can: upload or download files, take screenshots of their screen, record their keystrokes, steal all their stored passwords, and even jump to other computers on the same network. It's the ultimate tool for exploring a system after you've broken in."},
       {type:"hack",story:"You've exploited a Windows server and have a Meterpreter session. The client wants proof you can access sensitive data. Dump the password hashes.",q:"Extract all password hashes from the system.",a:["hashdump","run hashdump"],output:"meterpreter > hashdump\n\nAdministrator:500:aad3b435b51404ee:e02bc503339d51f71d913c245d35b50b:::\nGuest:501:aad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::\ncfo_williams:1001:aad3b435b51404ee:64f12cddaa88057e06a81b54e73b949b:::\nit_admin:1002:aad3b435b51404ee:7a21990fcd3d759941e45c490f143d5f:::\ndb_service:1003:aad3b435b51404ee:8846f7eaee8fb117ad06bdd830b7586c:::\n\n5 hashes dumped.",success:"5 accounts including the CFO and IT admin! These hashes can be cracked offline with hashcat.",why:"hashdump extracts NTLM password hashes from the SAM database. Works on Windows systems."},
       {type:"pick",q:"Meterpreter can:",opts:["All of these \u2014 it's a full toolkit","Only execute commands","Only upload files","Only take screenshots"],a:"All of these \u2014 it's a full toolkit",why:"Meterpreter handles files, screenshots, keylogging, hashes, pivoting, and more."},
     ]},
@@ -675,7 +675,7 @@ var SEC4 = {
   // ---- UNIT 12: PRIVILEGE ESCALATION ----
   {id:"u12",title:"Privilege Escalation",desc:"Go from nobody to root",levels:[
     {id:"u12l1",title:"Linux Privesc Basics",rounds:[
-      {type:"teach",text:"After breaking in you're a nobody. PrivEsc = promoting yourself to root. First checks: sudo -l (what can I run as root?), SUID files, kernel version. linpeas automates ALL these checks \u2014 run ./linpeas.sh and it highlights everything exploitable."},
+      {type:"teach",text:"When you first break into a system, you usually have very limited access \u2014 like being a guest in someone's house who can only sit in the living room. Privilege Escalation (PrivEsc) means finding a way to upgrade yourself to root (the admin account that can do ANYTHING). Your first move is always: run sudo -l to see what commands you're allowed to run as admin, look for SUID files (programs with that master key we learned about), and check the system's kernel version for known bugs. There's a tool called linpeas that automatically checks ALL of these things for you."},
       {type:"type",q:"Check sudo privileges:",a:["sudo -l","sudo -ll","sudo --list"],why:"First privilege escalation check."},
       {type:"type",q:"Run automated privesc enumeration:",a:["./linpeas.sh","bash linpeas.sh","sh linpeas.sh"],why:"LinPEAS checks everything: SUID, crons, configs, kernel."},
     ]},
@@ -685,7 +685,7 @@ var SEC4 = {
       {type:"scenario",situation:"LinPEAS shows a cron job runs /opt/backup.sh as root every 5 minutes, and you have write access to that file.",q:"What do you do?",opts:["Add a reverse shell to backup.sh","Delete the file","Ignore it","Run it manually"],a:"Add a reverse shell to backup.sh",why:"If root runs your script, your reverse shell connects back as root."},
     ]},
     {id:"u12l3",title:"Pivoting",rounds:[
-      {type:"teach",text:"Pivoting = using a hacked machine to reach hidden internal machines. Like breaking into the mailroom to access internal hallways. Chisel creates encrypted tunnels."},
+      {type:"teach",text:"Most companies keep their important servers hidden on an internal network that you can't reach from the internet. But if you hack a computer that's connected to BOTH the public internet AND the internal network, you can use it as a bridge. This is called Pivoting \u2014 like breaking into a building's mailroom that has a door to the internal hallways. From there, you can reach servers that were previously invisible to you. Tools like Chisel create encrypted tunnels through the hacked machine."},
       {type:"order",q:"Chisel pivoting setup:",items:["Start chisel server on your machine","Upload chisel to compromised host","Run chisel client pointing to server","Access internal target through tunnel"],why:"Server on attacker, client on victim."},
       {type:"teach",text:"SSH tunnels work too: ssh -L 8888:internal:80 user@compromised. Now localhost:8888 reaches the internal server's port 80 through the compromised host."},
     ]},
@@ -2068,17 +2068,17 @@ function renderLesson(){
   }
   // LAB
   else if(round.type==='lab'){
-    var step=0,labDone=false,steps=round.steps,cur=steps[0];
+    var step=0,labDone=false,steps=round.steps,cur=steps[0],hintsUsed=0;
     card.style.borderColor='#1a3a1a';
     card.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:.68rem;color:var(--green);font-weight:700;text-transform:uppercase;letter-spacing:1.5px">\uD83D\uDDA5\uFE0F LAB: '+esc(round.title)+'</div><span class="badge badge-level" id="labstep">1/'+steps.length+'</span></div>';
     card.innerHTML+='<div style="background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:.85rem"><strong style="color:var(--cyan)">\uD83C\uDFAF</strong> '+esc(round.objective)+'</div>';
     var term=document.createElement('div');term.className='labterm';
     if(round.banner){var bd2=document.createElement('div');bd2.className='o';bd2.textContent=round.banner;term.appendChild(bd2)}
     function addLn(c,t){var d=document.createElement('div');d.className=c;d.textContent=t;term.appendChild(d);term.scrollTop=term.scrollHeight}
-    addLn('h','\u27A1\uFE0F Step 1/'+steps.length+': '+cur.hint);card.appendChild(term);
+    addLn('h','Step 1/'+steps.length+' \u2014 What do you do?');card.appendChild(term);
     var lr=document.createElement('div');lr.style.cssText='display:flex;gap:6px;align-items:center;margin-top:8px';
     lr.innerHTML='<span style="color:var(--green);font-family:JetBrains Mono,monospace;font-size:.8rem">$</span>';
-    var li2=document.createElement('input');li2.className='inp';li2.style.cssText='flex:1;font-size:.8rem;padding:10px 12px';li2.placeholder=cur.placeholder||'Type command...';li2.autocomplete='off';li2.autocapitalize='off';li2.spellcheck=false;
+    var li2=document.createElement('input');li2.className='inp';li2.style.cssText='flex:1;font-size:.8rem;padding:10px 12px';li2.placeholder='Type command...';li2.autocomplete='off';li2.autocapitalize='off';li2.spellcheck=false;
     var lb=document.createElement('button');lb.className='btn sm';lb.textContent='Run';
     function runC(){if(labDone||!li2.value.trim())return;var cmd=li2.value.trim();li2.value='';addLn('p','$ '+cmd);cur=steps[step];
       var ok=false;for(var i=0;i<cur.accept.length;i++){var a=cur.accept[i];if(a.charAt(0)==='~'){if(cmd.toLowerCase().indexOf(a.slice(1).toLowerCase())!==-1){ok=true;break}}else if(cmd.toLowerCase().replace(/\s+/g,' ')===a.toLowerCase()){ok=true;break}}
@@ -2086,17 +2086,13 @@ function renderLesson(){
         if(step+1>=steps.length){addLn('s','\n\uD83C\uDF89 Lab Complete!');labDone=true;SFX.complete();li2.disabled=true;
           var nb=document.createElement('button');nb.className='btn full';nb.style.marginTop='8px';nb.textContent='Finish Lab \u2192';nb.onclick=function(){advance(true)};card.appendChild(nb);
         }
-        else{step++;cur=steps[step];addLn('h','\n\u27A1\uFE0F Step '+(step+1)+'/'+steps.length+': '+cur.hint);var ls2=document.getElementById('labstep');if(ls2)ls2.textContent=(step+1)+'/'+steps.length;drawQC()}
-      }else{SFX.wrong();addLn('f',cur.wrongMsg||'Not quite. Try again.');if(cur.example)addLn('h','\uD83D\uDCA1 Try: '+cur.example)}
+        else{step++;cur=steps[step];addLn('h','\nStep '+(step+1)+'/'+steps.length+' \u2014 What next?');var ls2=document.getElementById('labstep');if(ls2)ls2.textContent=(step+1)+'/'+steps.length}
+      }else{SFX.wrong();addLn('f','Not quite. Try something else.')}
     }
     li2.onkeydown=function(e){if(e.key==='Enter')runC()};lb.onclick=runC;
-    lr.appendChild(li2);lr.appendChild(lb);card.appendChild(lr);
-    var qr=document.createElement('div');qr.id='labqc';qr.style.cssText='display:flex;flex-wrap:wrap;gap:4px;margin-top:6px';card.appendChild(qr);
-    function drawQC(){
-      qr.innerHTML='';
-      if(cur.quickCmds){cur.quickCmds.forEach(function(c){var b=document.createElement('button');b.className='btn sm sec';b.style.cssText='font-family:JetBrains Mono,monospace;font-size:.7rem;padding:4px 8px';b.textContent=c;b.onclick=function(){li2.value=c;li2.focus()};qr.appendChild(b)})}
-    }
-    drawQC();
+    lr.appendChild(li2);lr.appendChild(lb);
+    var hb=document.createElement('button');hb.className='btn sm sec';hb.textContent='\uD83D\uDCA1 Hint';hb.onclick=function(){cur=steps[step];hintsUsed++;addLn('h','\uD83D\uDCA1 '+cur.hint);if(cur.example)addLn('h','Example: '+cur.example)};
+    lr.appendChild(hb);card.appendChild(lr);
   }
   w.appendChild(card);root.appendChild(w);
 }
