@@ -294,11 +294,11 @@ var SEC1 = {
       {type:"scenario",situation:"A friend asks you to hack their ex's Instagram to see if they're cheating.",q:"What do you do?",opts:["Refuse \u2014 unauthorized access is illegal","Help them, it's for a good cause","Do it but don't tell anyone","Only if they pay you"],a:"Refuse \u2014 unauthorized access is illegal",why:"Accessing someone's account without consent is a crime regardless of reason."},
     ]},
     // LAB
-    {id:"u1lab",title:"\uD83D\uDDA5\uFE0F Lab: Ethics Decisions",rounds:[
-      {type:"lab",title:"Ethics Decisions",objective:"Navigate ethical scenarios a pentester faces on the job.",banner:"Welcome to MegaCorp Security Consulting\nYour first day as a junior pentester.\n",steps:[
-        {hint:"Your manager hands you a scope document. What's the first thing you check?",accept:["~scope","~systems","~target","what systems","which systems"],output:"Scope document: Test authorized for:\n- 10.10.10.0/24 (web servers)\n- portal.megacorp.com\nOUT OF SCOPE: Database servers, employee workstations",successMsg:"Always read the scope FIRST. It defines your legal boundaries.",example:"what systems can I test",quickCmds:["what systems can I test"]},
-        {hint:"You accidentally discover a vulnerability on 10.10.20.5 which is OUT of scope. What do you do?",accept:["~report","~note","~document","~tell","~manager","~stop"],output:"Good call. You documented it and told your manager.\nThey'll contact the system owner through proper channels.",successMsg:"Never exploit out-of-scope findings. Document and report to your team lead.",example:"report to manager",quickCmds:["report to manager","document and stop"]},
-        {hint:"The client asks you to also test their employee email server (not in scope). What do you say?",accept:["~scope","~update","~writing","~written","~amendment","~new scope","~add"],output:"You requested a scope amendment in writing.\nClient signed the updated ROE adding email server testing.",successMsg:"Never test anything without written authorization, even if the client verbally asks!",example:"need updated scope in writing",quickCmds:["need updated scope in writing"]}
+    {id:"u1lab",title:"\uD83D\uDDA5\uFE0F Lab: Your First Day",rounds:[
+      {type:"lab",title:"Your First Day",objective:"It's your first day as a junior pentester at MegaCorp Security. Make the right calls.",banner:"Welcome to MegaCorp Security Consulting\nYou just sat down at your desk.\nYour manager walks over with a folder.\n'Here's your first job. Read through the scope.'\n",steps:[
+        {hint:"Read the scope document your manager gave you. What's the first thing you want to know?",accept:["~scope","~systems","~target","~what","~read","~check","~look","~allowed","~test","~open"],output:"SCOPE DOCUMENT - Project #4401\n================================\nClient: NovaTech Inc.\nYOU MAY TEST:\n  - 10.10.10.0/24 (web servers)\n  - portal.novatech.com\n\nDO NOT TEST:\n  - Database servers\n  - Employee workstations\n  - Email systems\n================================",successMsg:"Good \u2014 always read the scope first. This tells you exactly what you're allowed to touch.",example:"read the scope"},
+        {hint:"You start scanning and accidentally find a bug on 10.10.20.5 \u2014 a server that's NOT in your scope. What do you do?",accept:["~report","~note","~document","~tell","~manager","~stop","~don't","~leave","~ignore","~nothing","~skip","~move on"],output:"You flagged it in your notes and told your manager.\nThey'll handle it through the right channels.\n\nYou did NOT try to exploit it \u2014 smart move.",successMsg:"Touching anything outside your scope is illegal, even if you find it by accident. Just document and report.",example:"tell my manager"},
+        {hint:"Your manager says 'Great first day. One more thing \u2014 the client just called and verbally asked us to also test their email server.' What do you do?",accept:["~writing","~written","~scope","~update","~paper","~contract","~sign","~document","~amendment","~add.*scope","~new.*scope","~refuse","~can't","~need"],output:"You told your manager: 'We need that in writing first.'\n\nThe client signed an updated scope document.\nNOW you can legally test the email server.",successMsg:"Even if the client says 'go ahead' out loud, you need it in WRITING. Verbal permission isn't enough in court.",example:"we need that in writing"}
       ]}
     ]},
     // MASTERY
@@ -507,7 +507,7 @@ var SEC2 = {
   // ---- UNIT 7: WEB RECON ----
   {id:"u7",title:"Web Recon",desc:"Map web apps before attacking",levels:[
     {id:"u7l1",title:"HTTP Basics",rounds:[
-      {type:"teach",text:"HTTP methods: GET = request page. POST = send data. PUT = update. DELETE = remove. Status codes: 200=OK, 301=redirect, 403=forbidden (exists!), 404=not found, 500=server error."},
+      {type:"teach",text:"When your browser talks to a website, it uses different types of requests. GET means 'show me this page.' POST means 'here's some data' (like when you submit a login form). PUT means 'update this.' DELETE means 'remove this.' The website also sends back a number code telling you what happened: 200 means 'OK, here you go.' 403 means 'Forbidden \u2014 you're not allowed' (but the page EXISTS, which is useful info!). 404 means 'Page not found.' 500 means 'The server broke.'"},
       {type:"match",q:"Match HTTP method:",pairs:[["GET","Request data"],["POST","Send data"],["PUT","Update"],["DELETE","Remove"]],why:"Understanding HTTP is fundamental to web hacking."},
       {type:"pick",q:"A 403 response means:",opts:["Exists but access denied","Not found","Server crashed","Need to login"],a:"Exists but access denied",why:"403 confirms the resource exists. Useful intel."},
     ]},
@@ -517,7 +517,7 @@ var SEC2 = {
       {type:"hack",story:"robots.txt tells search engines what NOT to index. But it also tells hackers exactly where the interesting stuff is.",q:"Check what they're trying to hide.",a:["curl http://target.com/robots.txt","curl target.com/robots.txt"],output:"User-agent: *\nDisallow: /admin/\nDisallow: /api/internal/\nDisallow: /backup/database.sql\nDisallow: /debug/\n\nSitemap: http://target.com/sitemap.xml",success:"They accidentally published a roadmap to their most sensitive paths!",why:"robots.txt is meant for search engines but attackers read it too. Always check it first."},
     ]},
     {id:"u7l3",title:"Burp Suite",rounds:[
-      {type:"teach",text:"Burp Suite sits between browser and website, letting you see and change EVERY request. Proxy = intercept. Repeater = modify and resend. Intruder = try thousands of values."},
+      {type:"teach",text:"Burp Suite is a tool that sits between your browser and the website you're testing. Every time your browser sends a request, Burp catches it first and lets you see exactly what's being sent \u2014 and even change it before it goes through. It has three main modes: Proxy (catches and shows you requests), Repeater (lets you change a request and send it again to see what happens), and Intruder (automatically tries thousands of different values, like guessing passwords)."},
       {type:"match",q:"Match Burp tool:",pairs:[["Proxy","Intercept requests"],["Repeater","Modify/resend"],["Intruder","Automated attacks"],["Decoder","Encode/decode"]],why:"Each module serves a different purpose."},
       {type:"pick",q:"Burp's Repeater is for:",opts:["Modifying and resending requests","Scanning for vulns","Brute-forcing","Encoding text"],a:"Modifying and resending requests",why:"Repeater lets you tweak and replay HTTP requests."},
     ]},
@@ -580,9 +580,9 @@ var SEC3 = {
       {type:"tf",q:"XSS only works if the victim clicks a link.",a:false,why:"Stored XSS triggers automatically for anyone viewing the infected page."},
     ]},
     {id:"u9l2",title:"Command Injection",rounds:[
-      {type:"teach",text:"Some websites run system commands behind the scenes, like a 'ping' tool. If they don't filter your input, add a semicolon (;) to chain extra commands. Type 127.0.0.1; cat /etc/passwd and the server runs BOTH."},
+      {type:"teach",text:"Some websites have tools that run commands on the server behind the scenes. For example, a network tool that lets you 'ping' an IP address. The website takes what you type and plugs it directly into a command on the server. But if they don't check your input, you can sneak in extra commands using a semicolon (;). In a terminal, a semicolon means 'run this command, THEN run this next one.' So if you type 127.0.0.1; cat /etc/passwd the server runs the ping AND shows you the password file. You just ran your own command on their server."},
       {type:"hack",story:"This website has a 'ping' feature where you enter an IP address. Behind the scenes, the server runs: ping [your input]. Since they don't filter your input, you can sneak in extra commands after a semicolon.",q:"Use command injection to read /etc/passwd. (Hint: add ; cat /etc/passwd after an IP)",a:["127.0.0.1; cat /etc/passwd","| cat /etc/passwd","; cat /etc/passwd"],output:"PING 127.0.0.1: 64 bytes\n---\nroot:x:0:0:root:/root:/bin/bash\nwww-data:x:33:33::/var/www\nadmin:x:1000:1000::/home/admin:/bin/bash",success:"It ran BOTH commands! You got the user list through a website input field.",why:"The semicolon ; tells Linux to run a second command. The server ran ping AND cat.",quickCmds:["127.0.0.1; cat /etc/passwd"]},
-      {type:"teach",text:"SSRF (Server-Side Request Forgery) tricks the server into visiting internal pages that YOU can't reach directly. Like asking a waiter to go to the VIP room and bring back what's on the table. The server becomes your puppet to access hidden systems."},
+      {type:"teach",text:"SSRF (Server-Side Request Forgery) is a trick where you make the server visit a page FOR you. Imagine a restaurant where you can ask the waiter to go anywhere in the building. Normally you'd ask for the menu \u2014 but what if you told the waiter 'go to the manager's office and bring me what's on the desk'? That's SSRF. You find a feature on a website that fetches URLs (like a PDF generator or image loader), and instead of a normal URL, you give it an internal address that only the server can reach. Suddenly you're accessing hidden systems that were supposed to be private."},
     ]},
     {id:"u9l3",title:"Attack Scenarios",rounds:[
       {type:"scenario",situation:"You find a search bar on the target website. When you search for test, the URL becomes /search?q=test and your input appears in the page HTML.",q:"What vulnerability should you test for?",opts:["Reflected XSS","SQL Injection","SSRF","Brute force"],a:"Reflected XSS",why:"User input reflected in HTML without sanitization = potential XSS."},
@@ -606,7 +606,7 @@ var SEC3 = {
   // ---- UNIT 10: PASSWORD CRACKING ----
   {id:"u10",title:"Password Cracking",desc:"Break hashes and brute-force logins",levels:[
     {id:"u10l1",title:"How Hashes Work",rounds:[
-      {type:"teach",text:"Websites don't store your actual password \u2014 they scramble it into a hash. 'password' becomes '5f4dcc3b...cf99'. You can't reverse it, but you CAN hash every word in a dictionary and compare."},
+      {type:"teach",text:"When you create an account on a website, they don't actually store your password as-is. Instead they run it through a math formula that scrambles it into a random-looking string called a 'hash.' For example, the password 'password' becomes '5f4dcc3b5aa765d61d8327deb882cf99.' You can't reverse a hash back to the original password. But here's the trick: you CAN take a giant list of common passwords, hash each one, and compare the results to the stolen hash. If they match, you've cracked it."},
       {type:"pick",q:"Why can't you reverse a hash back to the original password?",opts:["Hashing is a one-way process","The password gets deleted","It's encrypted with a key","The algorithm is secret"],a:"Hashing is a one-way process",why:"Hashing destroys information. You can only guess passwords, scramble them, and compare."},
       {type:"teach",text:"Common hash types: MD5 = 32 characters long (old and weak, cracks fast). SHA-256 = 64 characters (stronger). bcrypt = starts with $2b$ (very slow to crack, used by modern sites). NTLM = used by Windows computers."},
     ]},
@@ -648,7 +648,7 @@ var SEC3 = {
       {type:"pick",q:"Meterpreter can:",opts:["All of these \u2014 it's a full toolkit","Only execute commands","Only upload files","Only take screenshots"],a:"All of these \u2014 it's a full toolkit",why:"Meterpreter handles files, screenshots, keylogging, hashes, pivoting, and more."},
     ]},
     {id:"u11l3",title:"Post-Exploitation",rounds:[
-      {type:"teach",text:"After getting in: sysinfo (system info), getuid (who am I), getsystem (try to get SYSTEM on Windows), shell (drop to normal shell), persistence (survive reboots)."},
+      {type:"teach",text:"Once you have Meterpreter running, here are the key commands: sysinfo tells you about the target computer (what OS, how much RAM, etc). getuid shows which user account you're running as. getsystem tries to upgrade you to the highest-level admin (called SYSTEM on Windows). shell gives you a regular command line on the target. And persistence sets things up so you stay connected even if they restart the computer."},
       {type:"scenario",situation:"You've got a meterpreter session on a Windows target. getuid shows you're a normal user, not admin.",q:"What do you try first?",opts:["getsystem to escalate privileges","hashdump for passwords","Delete logs","Disconnect"],a:"getsystem to escalate privileges",why:"getsystem tries several techniques to get SYSTEM (admin) privileges on Windows."},
       {type:"type",q:"Get system info in meterpreter:",a:["sysinfo","systeminfo"],why:"sysinfo shows OS, hostname, and architecture."},
     ]},
@@ -680,7 +680,7 @@ var SEC4 = {
       {type:"type",q:"Run automated privesc enumeration:",a:["./linpeas.sh","bash linpeas.sh","sh linpeas.sh"],why:"LinPEAS checks everything: SUID, crons, configs, kernel."},
     ]},
     {id:"u12l2",title:"Common Vectors",rounds:[
-      {type:"teach",text:"Misconfigured cron jobs (scheduled tasks running as root). World-writable scripts called by root. Credentials in config files. Kernel exploits for old versions."},
+      {type:"teach",text:"More ways to become root: Cron jobs are tasks that the computer runs automatically on a schedule (like 'run this cleanup script every hour'). If a cron job runs as root AND you can edit the script it runs, you can replace the script with your own code \u2014 and the system will run YOUR code as root. Also look for: config files with passwords left in them (developers are lazy), and old kernel versions with known bugs you can exploit."},
       {type:"tf",q:"If sudo -l shows you can run /usr/bin/find as root, that's a privesc path.",a:true,why:"find can execute commands: sudo find . -exec /bin/sh \\;"},
       {type:"scenario",situation:"LinPEAS shows a cron job runs /opt/backup.sh as root every 5 minutes, and you have write access to that file.",q:"What do you do?",opts:["Add a reverse shell to backup.sh","Delete the file","Ignore it","Run it manually"],a:"Add a reverse shell to backup.sh",why:"If root runs your script, your reverse shell connects back as root."},
     ]},
@@ -2041,9 +2041,18 @@ function renderLesson(){
     var btn=document.createElement('button');btn.className='btn sm';btn.textContent='Run';
     function runHack(){if(answered||!inp.value.trim())return;answered=true;
       var cmd=inp.value.trim();
-      var correct=false;for(var i=0;i<round.a.length;i++)if(cmd.toLowerCase().replace(/\s+/g,' ')===round.a[i].toLowerCase()){correct=true;break}
-      // Partial match: must be at least 60% of the expected command
-      if(!correct)for(var i=0;i<round.a.length;i++){var a=round.a[i].toLowerCase(),c=cmd.toLowerCase();if(c.length>=a.length*.6&&(a.indexOf(c)!==-1||c.indexOf(a)!==-1)){correct=true;break}}
+      var correct=false;var cmdL=cmd.toLowerCase().replace(/\s+/g,' ');
+      for(var i=0;i<round.a.length;i++){var aL=round.a[i].toLowerCase();
+        if(cmdL===aL){correct=true;break}
+        // Substring match with ~ prefix
+        if(round.a[i].charAt(0)==='~'){if(cmdL.indexOf(round.a[i].slice(1).toLowerCase())!==-1){correct=true;break};continue}
+        // Partial match: must be at least 60% of the expected command
+        if(cmdL.length>=aL.length*.6&&(aL.indexOf(cmdL)!==-1||cmdL.indexOf(aL)!==-1)){correct=true;break}
+        // Keyword overlap: 60%+ of key words match
+        var aWords=aL.replace(/[^a-z0-9]/g,' ').split(/\s+/).filter(function(w){return w.length>=3});
+        if(aWords.length>0){var hits=0;for(var j=0;j<aWords.length;j++){if(cmdL.indexOf(aWords[j])!==-1)hits++}
+          if(hits/aWords.length>=0.6){correct=true;break}}
+      }
       var cmdEl=document.getElementById('hackCmd');if(cmdEl){cmdEl.textContent=cmd;cmdEl.style.opacity='1'}
       termWrap.style.maxHeight='200px';
       if(correct){
@@ -2081,7 +2090,17 @@ function renderLesson(){
     var li2=document.createElement('input');li2.className='inp';li2.style.cssText='flex:1;font-size:.8rem;padding:10px 12px';li2.placeholder='Type command...';li2.autocomplete='off';li2.autocapitalize='off';li2.spellcheck=false;
     var lb=document.createElement('button');lb.className='btn sm';lb.textContent='Run';
     function runC(){if(labDone||!li2.value.trim())return;var cmd=li2.value.trim();li2.value='';addLn('p','$ '+cmd);cur=steps[step];
-      var ok=false;for(var i=0;i<cur.accept.length;i++){var a=cur.accept[i];if(a.charAt(0)==='~'){if(cmd.toLowerCase().indexOf(a.slice(1).toLowerCase())!==-1){ok=true;break}}else if(cmd.toLowerCase().replace(/\s+/g,' ')===a.toLowerCase()){ok=true;break}}
+      // Smart matching: exact, substring (~), or keyword overlap (60%+)
+      var cmdL=cmd.toLowerCase().replace(/\s+/g,' ');
+      var ok=false;for(var i=0;i<cur.accept.length;i++){var a=cur.accept[i];
+        if(a.charAt(0)==='~'){if(cmdL.indexOf(a.slice(1).toLowerCase())!==-1){ok=true;break}}
+        else{var aL=a.toLowerCase();if(cmdL===aL){ok=true;break}
+          // Keyword overlap: extract meaningful words (3+ chars), check if 60%+ match
+          var aWords=aL.replace(/[^a-z0-9]/g,' ').split(/\s+/).filter(function(w){return w.length>=3});
+          if(aWords.length>0){var hits=0;for(var j=0;j<aWords.length;j++){if(cmdL.indexOf(aWords[j])!==-1)hits++}
+            if(hits/aWords.length>=0.6){ok=true;break}}
+        }
+      }
       if(ok){SFX.correct();addLn('o',cur.output);if(cur.successMsg)addLn('s','\u2705 '+cur.successMsg);
         if(step+1>=steps.length){addLn('s','\n\uD83C\uDF89 Lab Complete!');labDone=true;SFX.complete();li2.disabled=true;
           var nb=document.createElement('button');nb.className='btn full';nb.style.marginTop='8px';nb.textContent='Finish Lab \u2192';nb.onclick=function(){advance(true)};card.appendChild(nb);
